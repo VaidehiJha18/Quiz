@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
 from ..services.auth_service import AuthService
 
-
 # Blueprint
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -25,17 +24,16 @@ def signup():
         return jsonify({"message": "Missing required fields"}), 400
 
     try:
-        new_user = auth_service.register_user(name, email, password)
+        new_user_id = auth_service.register_user(name, email, password)
         return jsonify({
             "message": "User created successfully",
-            "user_id": new_user.id
+            "user_id": new_user_id
         }), 201
     except ValueError as e:
         return jsonify({"message": str(e)}), 409
     except Exception as e:
         print(f"Error during signup: {e}")
         return jsonify({"message": "An internal server error occurred"}), 500
-
 
 # ----------------- Login -----------------
 @auth_bp.route('/login', methods=['POST', 'OPTIONS'])
@@ -56,19 +54,18 @@ def login():
     if user:
         session['logged_in'] = True
         session['user_id'] = user.id
-        session['username'] = user.user_name
+        session['username'] = user.username
         session['role'] = getattr(user, 'role', 'student')  # default role
         return jsonify({
             "message": "Login successful",
             "user": {
                 "id": user.id,
-                "name": user.user_name,
+                "name": user.username,
                 "role": session['role']
             }
         }), 200
     else:
         return jsonify({"message": "Invalid credentials"}), 401
-
 
 # ----------------- Logout -----------------
 @auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
@@ -79,7 +76,6 @@ def logout():
 
     session.clear()
     return jsonify({"message": "Logout successful"}), 200
-
 
 # ----------------- Get Profile -----------------
 @auth_bp.route('/profile', methods=['GET', 'OPTIONS'])
@@ -92,10 +88,10 @@ def get_profile():
         user_id = session.get('user_id')
         user_details = auth_service.get_user_by_id(user_id)
         return jsonify({
-            "user_id": user_details['id'],
-            "username": user_details['user_name'],
-            "email": user_details['email'],
-            "role": user_details.get('role_id', 'student'),
+            "user_id": user_details.id,
+            "username": user_details.username,
+            "email": user_details.email,
+            "role": getattr(user_details, 'role', 'student'),
             "message": "User profile data retrieved."
         }), 200
     else:

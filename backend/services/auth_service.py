@@ -1,4 +1,4 @@
-import bcrypt
+from argon2 import PasswordHasher, exceptions as argon2_exceptions
 from ..extensions import get_db_connection
 from ..models.user import User
 import pymysql.cursors
@@ -12,6 +12,7 @@ class AuthService:
     }
 
     def __init__(self):
+        self.ph = PasswordHasher()
         # Email regex patterns
         self.ADMIN_EMAIL_PATTERN = r'^(admin-\d+|[a-zA-Z0-9.]+admin)@gsfcuniversity\.ac\.in$'
         self.PROFESSOR_EMAIL_PATTERN = r'^[a-zA-Z0-9.]+@gsfcuniversity\.ac\.in$'
@@ -32,11 +33,14 @@ class AuthService:
 
     # Hash password for signup
     def _hash_password(self, password):
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        return self.ph.hash(password)
 
     # Check password during login
     def _check_password(self, stored_hash, password):
-        return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+        try:
+            return self.ph.verify(stored_hash, password)
+        except argon2_exceptions.VerifyMismatchError:
+            return False
 
     # ----------------- SIGNUP -----------------
     def register_user(self, user_name, email, password):

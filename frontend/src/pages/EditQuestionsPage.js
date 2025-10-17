@@ -46,7 +46,7 @@ export default function EditQuestionPage({ isNew }) {
         await updateQuestion(questionId, payload);
       }
       alert('Question saved successfully!');
-      navigate('/professor/questions');
+      navigate('/professor/question');
     } catch (err) {
       alert('Error saving question.');
     }
