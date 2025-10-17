@@ -1,2 +1,2 @@
 # Quiz
-Quiz Application university project.
+Quiz Application University project.
