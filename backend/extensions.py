@@ -3,10 +3,10 @@ from flask import current_app
 
 def get_db_connection():
     return pymysql.connect(
-        host=current_app.config['host'],
-        user=current_app.config['user'],
-        password=current_app.config['password'],
-        db=current_app.config['database'],
-        port=current_app.config['port'],
-        cursorclass=pymysql.cursors.DictCursor 
+        host=current_app.config['DB_HOST'],
+        user=current_app.config['DB_USER'],
+        password=current_app.config['DB_PASSWORD'],
+        db=current_app.config['DB_DATABASE'],
+        port=current_app.config['DB_PORT'],
+        cursorclass=pymysql.cursors.DictCursor
     )

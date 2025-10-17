@@ -1,7 +1,7 @@
 // src/api/apiService.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api'; // Flask backend URL
+const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
 
 // Generic API service
 export const api = axios.create({

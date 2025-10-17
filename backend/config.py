@@ -1,21 +1,20 @@
 import os
 import pymysql
 
-try:
-    connection = pymysql.connect(
-        host='public-mysql-35ccb4d9-quizapplication.d.aivencloud.com',
-        user='avnadmin',
-        password='AVNS_IGyQyvOs9EJELlKx9h4',
-        database='dbquiz',
-        port=26056
-    )
-    print("Successfully connected to the database using PyMySQL!")
+# try:
+#     connection = pymysql.connect(
+#         host='public-mysql-35ccb4d9-quizapplication.d.aivencloud.com',
+#         user='avnadmin',
+#         password='AVNS_IGyQyvOs9EJELlKx9h4',
+#         database='dbquiz',
+#         port=26056
+#     )
+#     print("Successfully connected to the database using PyMySQL!")
 
-except pymysql.MySQLError as e:
-    print(f"Failed to connect to the database: {e}")
+# except pymysql.MySQLError as e:
+#     print(f"Failed to connect to the database: {e}")
     
     
-import os
 
 class Config:
     # Database
