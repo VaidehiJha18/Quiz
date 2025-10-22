@@ -1,10 +1,8 @@
 from ..extensions import get_db_connection
 import random
 import pymysql
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
-
-# NOTE: You will need a 'questions' and 'quizzes' table in MySQL.
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField
@@ -48,6 +46,7 @@ def fetch_questions(email, fetch_scope='creator'):
     sql_id = "SELECT id FROM employee WHERE email = %s"
     cursor.execute(sql_id, (email,))
     employee_record = cursor.fetchone()
+    
     if employee_record:
         employee_id = employee_record['id']
     elif fetch_scope == 'creator':
@@ -68,13 +67,16 @@ def fetch_questions(email, fetch_scope='creator'):
             JOIN
                 answer_map am ON qb.id = am.question_id
         """
+
         join_clause = ""
         where_clause = ""
+
         if fetch_scope == 'creator':
             join_clause = "JOIN question_employee qe ON qb.id = qe.question_id"
             where_clause = "WHERE qe.employee_id = %s"
         elif fetch_scope == 'all':
-            pass         #fetch all questions, no extra clauses   
+            pass         #fetch all questions, no extra clauses 
+        
         sql_questions = f"""
             {select_clause}
             {join_clause}
@@ -104,15 +106,92 @@ def fetch_questions(email, fetch_scope='creator'):
                     'options': [],
                     'correct_answer_id': None 
                 }
+            
             option_data = {
                 'option_id': row['option_id'],
                 'text': row['option_text'],
                 'is_correct': row['is_correct']
             }
-            structured_questions[q_id]['options'].append(option_data) 
+            structured_questions[q_id]['options'].append(option_data)
+            
             if row['is_correct'] == 1:
                 structured_questions[q_id]['correct_answer_id'] = row['option_id']
         return list(structured_questions.values())
     finally:
         cursor.close()
-        conn.close() 
+        conn.close()    
+        
+# 3. Generate and Save Quiz
+def generate_and_save_quiz(creator_email):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor) 
+    
+    teacher_id = None
+    quiz_id = None
+
+    try:
+        # Step 1: Get the teacher_id (employee_id) from the creator's email
+        sql_id = "SELECT id FROM employee WHERE email = %s"
+        cursor.execute(sql_id, (creator_email,))
+        employee_record = cursor.fetchone()
+        
+        if employee_record:
+            teacher_id = employee_record['id']
+        else:
+            raise ValueError(f"Creator email '{creator_email}' not found in employee records.")
+
+        cursor.execute("SELECT id FROM question_bank")
+        all_questions = cursor.fetchall()
+
+        all_ids = [q['id'] for q in all_questions]
+        SAMPLE_SIZE = 5
+        
+        if not all_ids:
+            # No questions available to create a quiz
+            return None 
+
+        selected_ids = random.sample(all_ids, min(SAMPLE_SIZE, len(all_ids))) 
+        
+        unique_link_id = str(uuid.uuid4())
+        quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        sql_quiz = """
+            INSERT INTO generated_quizzes 
+                (teacher_id, quiz_title, quiz_status, total_questions, total_marks, time_limit, quiz_link, scheduled_start_time, scheduled_end_time)
+            VALUES 
+                (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        QUIZ_STATUS = 'DRAFT'
+        TOTAL_QUESTIONS = len(selected_ids)
+        TOTAL_MARKS = TOTAL_QUESTIONS * 10 
+        TIME_LIMIT = 10 
+        SCHEDULED_START = datetime.now()
+        SCHEDULED_END = datetime.now() + timedelta(days=7) 
+
+        cursor.execute(sql_quiz, (
+            teacher_id,
+            quiz_title,
+            QUIZ_STATUS,
+            TOTAL_QUESTIONS,
+            TOTAL_MARKS,
+            TIME_LIMIT,
+            unique_link_id, 
+            SCHEDULED_START,
+            SCHEDULED_END
+        ))
+        quiz_id = cursor.lastrowid
+        conn.commit()
+        
+        sql_link_questions = "INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)"
+        
+        question_links = [(quiz_id, q_id) for q_id in selected_ids]
+
+        cursor.executemany(sql_link_questions, question_links)
+        conn.commit()
+        
+        return quiz_id 
+        
+    finally:
+        cursor.close()
+        conn.close()
