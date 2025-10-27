@@ -1,4 +1,5 @@
 from ..extensions import get_db_connection
+from ..import create_app
 import random
 import pymysql
 from flask import session
@@ -9,7 +10,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField
 from wtforms.validators import DataRequired 
 
-class PythonQuestionForm(FlaskForm):
+class QuestionForm(FlaskForm):
     pass 
 
 
@@ -43,11 +44,6 @@ def fetch_questions(email, fetch_scope='creator'):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor) 
     employee_id = None
-
-    # --- Step 1: Find Employee ID (Required for filtering) ---
-    sql_id = "SELECT id FROM employee WHERE email = %s"
-    cursor.execute(sql_id, (email,))
-    employee_record = cursor.fetchone()
     
     if employee_record:
         employee_id = employee_record['id']
@@ -55,73 +51,65 @@ def fetch_questions(email, fetch_scope='creator'):
         return []
     
     try:
-        # --- Step 2: Construct the SQL Query ---
+        # Select the course_id from dropdown and connect here
+        course_id = 21 # for now
+        emp_id = 1
+        # Fetch questions based on employee and course
         select_clause = """
             SELECT 
-                qb.id AS question_id,
+                qb.id,
                 qb.question_txt,
-                qb.unit,    
-                am.id AS option_id,
+                qb.unit, 
+                am.id,
                 am.option_text,
                 am.is_correct
             FROM
                 question_bank qb
             JOIN
                 answer_map am ON qb.id = am.question_id
+            JOIN
+                question_employee qe ON qb.id = qe.question_id
+            JOIN
+                question_course qc ON qb.id = qc.question_id
+            WHERE
+                qe.employee_id = %s 
+                AND qc.course_id = %s
         """
+        # q.question_type not included
+        # Possible additions: Select by Unit, question_type etc.
 
-        join_clause = ""
-        where_clause = ""
+        cursor = conn.cursor(dictionary=True) # dictionary=True is very helpful
+        cursor.execute(select_clause)
+        results = cursor.fetchall()
 
-        if fetch_scope == 'creator':
-            join_clause = "JOIN question_employee qe ON qb.id = qe.question_id"
-            where_clause = "WHERE qe.employee_id = %s"
-        elif fetch_scope == 'all':
-            pass         #fetch all questions, no extra clauses 
-        
-        sql_questions = f"""
-            {select_clause}
-            {join_clause}
-            {where_clause}
-            ORDER BY 
-                qb.id DESC, am.id ASC
-            LIMIT 60
-        """
+    except:
+        print("Query failed to execute")
 
-        # --- Step 3: Execute the query ---
-        if fetch_scope == 'creator':
-            cursor.execute(sql_questions, (employee_id,))
-        else:
-            cursor.execute(sql_questions)
-        raw_records = cursor.fetchall()
+    questions_with_options = {}
 
-        # --- Step 4: Process the flat record set into a structured format ---
-        structured_questions = {}
-        for row in raw_records:
-            q_id = row['question_id']
-            
-            if q_id not in structured_questions:
-                structured_questions[q_id] = {
-                    'id': q_id,
-                    'question_txt': row['question_txt'],
-                    'unit': row['unit'],
-                    'options': [],
-                    'correct_answer_id': None 
-                }
-            
-            option_data = {
-                'option_id': row['option_id'],
-                'text': row['option_text'],
-                'is_correct': row['is_correct']
-            }
-            structured_questions[q_id]['options'].append(option_data)
-            
-            if row['is_correct'] == 1:
-                structured_questions[q_id]['correct_answer_id'] = row['option_id']
-        return list(structured_questions.values())
-    finally:
-        cursor.close()
-        conn.close()    
+    for row in results:
+        q_id = row['question_id']
+    
+    if q_id not in questions_with_options:
+        questions_with_options[q_id] = {
+            'question_id': q_id,
+            'question_txt': row['question_txt'],
+            'unit': row['unit'],
+            'options': []  # Start an empty list for its options
+        }
+    
+        questions_with_options[q_id]['options'].append({
+            'option_id': row['option_id'],
+            'option_text': row['option_text'],
+            'is_correct': row['is_correct']
+        })
+
+    print(questions_with_options)
+    # finally:
+    #     cursor.close()
+    #     conn.close()
+
+    return questions_with_options  
         
 # 3. Generate and Save Quiz
 def generate_and_save_quiz(teacher_id):
@@ -131,20 +119,15 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
+<<<<<<< Updated upstream
     try:
+=======
+    questions_with_options = fetch_questions(creator_email)
+>>>>>>> Stashed changes
 
-        cursor.execute("SELECT id FROM question_bank")
-        all_questions = cursor.fetchall()
+    #Sample only a few questions
 
-        all_ids = [q['id'] for q in all_questions]
-        SAMPLE_SIZE = 5
-        
-        if not all_ids:
-            # No questions available to create a quiz
-            return None 
-
-        selected_ids = random.sample(all_ids, min(SAMPLE_SIZE, len(all_ids))) 
-        
+    try:    
         unique_link_id = str(uuid.uuid4())
         quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -188,3 +171,8 @@ def generate_and_save_quiz(teacher_id):
     finally:
         cursor.close()
         conn.close()
+
+if __name__ == "__main__":
+    app = create_app()
+    email = 'vishalharith@gsfcuniversity.ac.in'
+    fetch_questions(email)
