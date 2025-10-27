@@ -62,7 +62,11 @@ def create_question_api():
 @professor_required
 def generate_quiz_api():
     try:
-        quiz_id = quiz_service.generate_and_save_quiz(session.get('email'))
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        quiz_id = quiz_service.generate_and_save_quiz('teacher_id')
         return jsonify({
             "message": "Quiz generated and saved for review.",
             "quiz_id": quiz_id
