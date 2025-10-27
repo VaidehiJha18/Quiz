@@ -1,6 +1,7 @@
 from ..extensions import get_db_connection
 import random
 import pymysql
+from flask import session
 from datetime import datetime, timedelta
 import uuid
 
@@ -10,6 +11,7 @@ from wtforms.validators import DataRequired
 
 class PythonQuestionForm(FlaskForm):
     pass 
+
 
 # 1. Database Add Question
 def insert_question(form_data, email):
@@ -27,9 +29,9 @@ def insert_question(form_data, email):
     try:
         cursor.execute(sql, (
             form_data['question_txt'], 
-            form_data['DEFAULT_TYPE'], 
-            form_data['DEFAULT_UNIT'], 
-            form_data['DEFAULT_MARKS'],
+            DEFAULT_TYPE,  
+            DEFAULT_UNIT,  
+            DEFAULT_MARKS,
         ))
         conn.commit()
     finally:
@@ -122,23 +124,14 @@ def fetch_questions(email, fetch_scope='creator'):
         conn.close()    
         
 # 3. Generate and Save Quiz
-def generate_and_save_quiz(creator_email):
+def generate_and_save_quiz(teacher_id):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor) 
     
-    teacher_id = None
+    # teacher_id = None
     quiz_id = None
 
     try:
-        # Step 1: Get the teacher_id (employee_id) from the creator's email
-        sql_id = "SELECT id FROM employee WHERE email = %s"
-        cursor.execute(sql_id, (creator_email,))
-        employee_record = cursor.fetchone()
-        
-        if employee_record:
-            teacher_id = employee_record['id']
-        else:
-            raise ValueError(f"Creator email '{creator_email}' not found in employee records.")
 
         cursor.execute("SELECT id FROM question_bank")
         all_questions = cursor.fetchall()
