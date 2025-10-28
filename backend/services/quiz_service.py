@@ -40,27 +40,24 @@ def insert_question(form_data, email):
         conn.close()
 
 # 2. Database fetch all questions
-def fetch_questions(email, fetch_scope='creator'):
+def fetch_questions(employee_id, fetch_scope='creator'):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor) 
-    employee_id = None
     
-    if employee_record:
-        employee_id = employee_record['id']
-    elif fetch_scope == 'creator':
+    if not employee_id and fetch_scope == 'creator':
         return []
     
     try:
         # Select the course_id from dropdown and connect here
         course_id = 21 # for now
-        emp_id = 1
+        emp_id = employee_id
         # Fetch questions based on employee and course
         select_clause = """
             SELECT 
-                qb.id,
+                qb.id AS question_id,
                 qb.question_txt,
                 qb.unit, 
-                am.id,
+                am.id AS option_id,
                 am.option_text,
                 am.is_correct
             FROM
@@ -78,26 +75,30 @@ def fetch_questions(email, fetch_scope='creator'):
         # q.question_type not included
         # Possible additions: Select by Unit, question_type etc.
 
-        cursor = conn.cursor(dictionary=True) # dictionary=True is very helpful
-        cursor.execute(select_clause)
+        cursor.execute(select_clause, (emp_id, course_id)) # dictionary=True is very helpful
         results = cursor.fetchall()
 
-    except:
-        print("Query failed to execute")
+    except Exception as e:
+        print(f"Query failed to execute: {e}")
+        return []
+        
+    finally:
+        cursor.close()
+        conn.close()
 
     questions_with_options = {}
 
     for row in results:
-        q_id = row['question_id']
-    
-    if q_id not in questions_with_options:
-        questions_with_options[q_id] = {
-            'question_id': q_id,
-            'question_txt': row['question_txt'],
-            'unit': row['unit'],
-            'options': []  # Start an empty list for its options
-        }
-    
+        q_id = row['question_id'] 
+        
+        if q_id not in questions_with_options:
+            questions_with_options[q_id] = {
+                'question_id': q_id,
+                'question_txt': row['question_txt'],
+                'unit': row['unit'],
+                'options': [] 
+            }
+        
         questions_with_options[q_id]['options'].append({
             'option_id': row['option_id'],
             'option_text': row['option_text'],
@@ -105,11 +106,8 @@ def fetch_questions(email, fetch_scope='creator'):
         })
 
     print(questions_with_options)
-    # finally:
-    #     cursor.close()
-    #     conn.close()
 
-    return questions_with_options  
+    return list(questions_with_options.values()) 
         
 # 3. Generate and Save Quiz
 def generate_and_save_quiz(teacher_id):
@@ -119,15 +117,18 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
-<<<<<<< Updated upstream
-    try:
-=======
-    questions_with_options = fetch_questions(creator_email)
->>>>>>> Stashed changes
-
-    #Sample only a few questions
-
     try:    
+        cursor.execute("SELECT id FROM question_bank")
+        all_questions = cursor.fetchall()
+
+        all_ids = [q['id'] for q in all_questions]
+        SAMPLE_SIZE = 5
+        
+        if not all_ids:
+            return None 
+
+        selected_ids = random.sample(all_ids, min(SAMPLE_SIZE, len(all_ids)))
+
         unique_link_id = str(uuid.uuid4())
         quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -172,7 +173,3 @@ def generate_and_save_quiz(teacher_id):
         cursor.close()
         conn.close()
 
-if __name__ == "__main__":
-    app = create_app()
-    email = 'vishalharith@gsfcuniversity.ac.in'
-    fetch_questions(email)

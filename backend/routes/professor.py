@@ -36,7 +36,11 @@ def get_professor_data():
 @professor_required
 def get_quizzes_api():
     try:
-        quizzes = quiz_service.get_professor_quizzes(session.get('email'))
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        quizzes = quiz_service.get_professor_quizzes(session.get(teacher_id))
         return jsonify(quizzes), 200
     except Exception as e:
         return jsonify({"message": f"Error fetching quizzes: {str(e)}"}), 500
@@ -66,10 +70,24 @@ def generate_quiz_api():
         if not teacher_id:
             return jsonify({"message": "User ID not found in session. Please log in again."}), 400
         
-        quiz_id = quiz_service.generate_and_save_quiz('teacher_id')
+        quiz_id = quiz_service.generate_and_save_quiz(teacher_id)
         return jsonify({
             "message": "Quiz generated and saved for review.",
             "quiz_id": quiz_id
         }), 201
     except Exception as e:
         return jsonify({"message": f"Quiz generation failed: {str(e)}"}), 500
+
+# 5. API to fetch questions for quiz creation
+@professor_bp.route('/questions', methods=['GET'])
+@professor_required
+def get_questions_api():
+    try:
+        employee_id = session.get('id')
+        if not employee_id:
+            return jsonify({"message": "User ID not found in session."}), 400
+
+        questions = quiz_service.fetch_questions(employee_id, fetch_scope='creator')
+        return jsonify(questions), 200
+    except Exception as e:
+        return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
