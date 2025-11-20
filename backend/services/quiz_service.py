@@ -116,16 +116,13 @@ def generate_and_save_quiz(teacher_id):
     
     # teacher_id = None
     quiz_id = None
-
-<<<<<<< Updated upstream
-=======
-    try:
-    questions_with_options = fetch_questions(creator_email)
+    
+    # try:
+    # questions_with_options = fetch_questions(creator_email)
     
     #  Sample only a few questions
 
 
->>>>>>> Stashed changes
     try:    
         cursor.execute("SELECT id FROM question_bank")
         all_questions = cursor.fetchall()

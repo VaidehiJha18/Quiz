@@ -1,15 +1,18 @@
-from flask import Flask
-from flask_cors import CORS
+from flask import Flask, request
+from flask_cors import CORS  
 from .config import Config
 
 def create_app(config_class=Config):
     app = Flask(__name__)
-
-    # In production, definite origins need to be defined
-    CORS(app, supports_credentials=True)
-
+    
     app.config.from_object(config_class)
 
+    # ✅ Only use CORS - this is enough
+    CORS(app, 
+        resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}},
+        supports_credentials=True 
+    )
+    
     # Register Blueprints
     from .routes.auth import auth_bp
     from .routes.professor import professor_bp
@@ -17,14 +20,87 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(professor_bp, url_prefix='/prof')
     app.register_blueprint(student_bp, url_prefix='/student')
-
-    # ✅ Add after_request inside create_app
-    # @app.after_request
-    # def add_cors_headers(response):
-    #     response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
-    #     response.headers.add("Access-Control-Allow-Credentials", "true")
-    #     response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-    #     response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE")
-    #     return response
-
+    
     return app
+# from flask import Flask
+# from flask_cors import CORS  
+# from .config import Config
+
+# def create_app(config_class=Config):
+#     app = Flask(__name__)
+    
+#     app.config.from_object(config_class)
+
+    
+#     CORS(app, 
+#         resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}},
+#         supports_credentials=True 
+#     )
+    
+#     # Register Blueprints
+#     from .routes.auth import auth_bp
+#     from .routes.professor import professor_bp
+#     from .routes.student import student_bp
+#     app.register_blueprint(auth_bp)
+#     app.register_blueprint(professor_bp, url_prefix='/prof')
+#     app.register_blueprint(student_bp, url_prefix='/student')
+
+#     # ✅ Keep the after_request handler (or use CORS above, not both)
+#     @app.after_request
+#     def add_cors_headers(response):
+#         response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+#         response.headers.add("Access-Control-Allow-Credentials", "true")
+#         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+#         response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE")
+#         return response
+    
+#     return app  # ✅ Keep this as the last line
+
+#     # ❌ REMOVE EVERYTHING BELOW - it's unreachable code
+#     # @app.route('/auth/login', methods=['POST'])
+#     # def login():
+#     #     pass
+# # from flask import Flask
+# # # from flask_cors import CORS
+# # from .config import Config
+
+# # def create_app(config_class=Config):
+# #     app = Flask(__name__)
+
+# #     # In production, definite origins need to be defined
+# # #     CORS(app, 
+# # #             resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3000"]}},
+# # #             supports_credentials=True 
+# # #     )
+    
+# #     app.config.from_object(config_class)
+
+# #     # Register Blueprints
+# #     from .routes.auth import auth_bp
+# #     from .routes.professor import professor_bp
+# #     from .routes.student import student_bp
+# #     app.register_blueprint(auth_bp)
+# #     app.register_blueprint(professor_bp, url_prefix='/prof')
+# #     app.register_blueprint(student_bp, url_prefix='/student')
+
+# #     # ✅ Add after_request inside create_app
+# #     # @app.after_request
+# #     # def add_cors_headers(response):
+# #     #     response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+# #     #     response.headers.add("Access-Control-Allow-Credentials", "true")
+# #     #     response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+# #     #     response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE")
+# #     #     return response
+# #     @app.after_request
+# #     def add_cors_headers(response):
+# #         # Must be the specific origin, not '*'
+# #         response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+# #         response.headers.add("Access-Control-Allow-Credentials", "true")
+# #         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+# #         response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE")
+# #         return response
+# #     return app
+# #     @app.route('/auth/login', methods=['POST'])
+# #     def login():
+# #     # your login code
+# #         pass
