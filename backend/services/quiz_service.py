@@ -15,26 +15,50 @@ class QuestionForm(FlaskForm):
 
 
 # 1. Database Add Question
-def insert_question(form_data, email):
+def insert_question(form_data): #add email parameter later
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Define default values for the required columns not provided by the user
     DEFAULT_TYPE = "MCQ"
     DEFAULT_UNIT = 1
     DEFAULT_MARKS = 1
-    
-    sql = """
+
+    sql_insert_question_bank = """
         INSERT INTO question_bank (question_txt, question_type, unit, marks)
         VALUES (%s, %s, %s, %s)
     """
+
+    sql_insert_options = """
+        INSERT INTO answer_map (question_id, option_text, is_correct)
+        VALUES (%s, %s, %s)
+    """
+
     try:
-        cursor.execute(sql, (
+        cursor.execute(sql_insert_question_bank, (
             form_data['question_txt'], 
             DEFAULT_TYPE,  
             DEFAULT_UNIT,  
             DEFAULT_MARKS,
         ))
-        conn.commit()
+
+        new_question_id = cursor.lastrowid
+        correct_index = int(form_data['correct'])
+
+        for index, option_text in enumerate(form_data['options']):
+            is_correct_flag = 1 if index == correct_index else 0
+            cursor.execute(sql_insert_options, (
+                new_question_id,
+                option_text,
+                is_correct_flag,
+            ))
+
+        print(f"Inserted question ID: {new_question_id} with options.")
+
+        conn.commit() 
+        
+    except Exception as e:
+        conn.rollback() 
+        print(f"Database error: {e}")
+
     finally:
         cursor.close()
         conn.close()
@@ -117,8 +141,7 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
-
-    #try:
+    # try:
     questions_with_options = fetch_questions(creator_email)
     
     #  Sample only a few questions
@@ -180,9 +203,24 @@ def generate_and_save_quiz(teacher_id):
         cursor.close()
         conn.close()
 
-if __name__ == "__main__":
-    app = create_app()
-    with app.app_context():
-        test_employee_id = 1
-        test_scope = 'creator'
-        print(fetch_questions(test_employee_id, test_scope))
+# if __name__ == "__main__":
+#     app = create_app()
+    # with app.app_context():
+        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+        # Testing fetch_questions 
+        # test_employee_id = 1
+        # test_scope = 'creator'
+        # print(fetch_questions(test_employee_id, test_scope))
+
+        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+        # Example, Testing data
+        # form_data = {
+        #     'question_txt': 'What is the capital of Germany?', 
+        #     'options': ['Berlin', 'Munich', 'Frankfurt', 'Hamburg'],
+        #     'correct': '0'
+        # }
+        
+        # insert_question(form_data)
+
+        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+        # Testing generate_and_save_quiz

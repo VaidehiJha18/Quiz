@@ -53,20 +53,25 @@ def get_quizzes_api():
         return jsonify({"message": f"Error fetching quizzes: {str(e)}"}), 500
 
 # 3. API to add a new question
-@professor_bp.route('/question', methods=['POST'])
+@professor_bp.route('/add_questions', methods=['POST'])
 @professor_required
-def create_question_api():
-    # React sends JSON data:
+def add_question_api():
+    print("Received request to add question.")
     data = request.get_json() 
-    # You should validate this data before passing it to the service
-    if not all(key in data for key in ['question', 'option_a', 'answer']):
-        return jsonify({"message": "Missing required question fields"}), 400
+    print(f"Request data: {data}")
+    
+    # --- Data Validation Checks ---
+    required_keys = ['text', 'options', 'correct_index']
+    if not all(key in data for key in required_keys):
+        return jsonify({"message": f"Missing required fields"}), 400
 
     try:
-        quiz_service.insert_question(data, session.get('email'))
+        quiz_service.insert_questions(data, session.get('email'))
         return jsonify({"message": "Question added successfully!"}), 201
+        
     except Exception as e:
-        return jsonify({"message": f"Database error: {str(e)}"}), 500
+        print(f"Error during question insertion: {str(e)}")
+        return jsonify({"message": "Internal server error during database operation."}), 500
 
 # 4. API to generate a quiz
 @professor_bp.route('/generate', methods=['POST'])

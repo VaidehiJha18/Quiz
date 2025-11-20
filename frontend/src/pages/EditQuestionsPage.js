@@ -264,7 +264,15 @@ import { addQuestion, updateQuestion, fetchQuestions } from '../api/apiService';
 
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
+
+  // options is an array of 4 strings.
+  // 'correct' will now store the INDEX as a string ("0", "1", "2", "3")
+  const [formData, setFormData] = useState({ 
+    text: '', 
+    options: ['', '', '', ''], 
+    correct: '' 
+  });
 
   // Options is an array of 4 strings.
   // 'correct' stores the INDEX as a string ("0", "1", "2", "3")
@@ -320,47 +328,36 @@ export default function EditQuestionPage({ isNew }) {
   // 3. Updated Handle Submit (Strict Validation)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    const cleanOptions = formData.options.filter(opt => opt.trim() !== "");
 
-    // Validation 1: Check Question Text
-    if (!formData.text.trim()) {
-      alert("Please enter the Question Text.");
-      return;
-    }
-
-    // Validation 2: Check if ANY of the 4 options are empty
-    if (formData.options.some(opt => opt.trim() === "")) {
-        alert("All 4 options are mandatory. Please fill them all in.");
+    // Basic Validation
+    if(cleanOptions.length < 2) {
+        alert("Please provide at least 2 options.");
         return;
     }
-
-    // Validation 3: Check Correct Answer
-    if (formData.correct === '') {
-        alert("Please select the Correct Answer from the dropdown.");
+    if(formData.correct === '') {
+        alert("Please select which option is the correct answer.");
         return;
     }
-
-    // Convert the selected "Index" back to "Text"
-    const selectedIndex = parseInt(formData.correct);
-    const correctAnsText = formData.options[selectedIndex];
-
-    const payload = {
-      text: formData.text,
-      options: formData.options, 
-      correct: correctAnsText,
+    // ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
+    const dataToSend = {
+        text: formData.text, 
+        options: cleanOptions, 
+        correct_index: formData.correct, 
+        question_type: 'MCQ',
+        unit: 1, 
+        marks: 1, 
     };
 
     try {
-      if (isNew) {
-        await addQuestion(payload);
-      } else {
-        await updateQuestion(questionId, payload);
-      }
-      alert('Question saved successfully!');
-      navigate('/professor/questions'); 
-    } catch (err) {
-      alert('Error saving question.');
-      console.error(err);
+        const response = await addQuestion(dataToSend); 
+        alert("Question saved successfully!");
+    } catch (error) {
+        console.error("Failed to add question:", error.response ? error.response.data : error.message);
+        alert("Error saving question. Please try again.");
     }
+    // ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
   };
 
   return (
