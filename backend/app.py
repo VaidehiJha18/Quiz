@@ -6,6 +6,13 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    app.config.update(
+        # SESSION_COOKIE_SAMESITE="None",
+        SESSION_COOKIE_SECURE=False,
+        # Ensure SECRET_KEY is confirmed active
+        SECRET_KEY=app.config.get('SECRET_KEY')
+    )
+
     # Enable CORS for all routes
     CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 

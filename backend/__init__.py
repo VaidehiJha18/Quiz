@@ -5,9 +5,11 @@ from .config import Config
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
 
     # ✅ Enable CORS for all routes
     CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
+    
 
     # Register Blueprints
     from .routes.auth import auth_bp
