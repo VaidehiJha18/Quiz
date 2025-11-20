@@ -38,6 +38,9 @@ function App() {
           <Route path="questions/add" element={<EditQuestionsPage isNew />} />
           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
           <Route path="results" element={<ResultsPage role="professor" />} />
+
+          <Route path="generate-quiz" element={<h1>Generate Quiz Page</h1>} />
+
           {/* You will need to create components for these new pages */}
           <Route path="students" element={<h1>Manage Students Page</h1>} />
           <Route path="analytics" element={<h1>Analytics Page</h1>} />
