@@ -129,6 +129,28 @@ export default function ViewQuestionsPage() {
     }
   };
 
+  const columns = [
+    { Header: 'ID', accessor: 'id' },
+    { Header: 'Question', accessor: 'text' },
+    { Header: 'Option_1', accessor: 'options' },
+    { Header: 'Option_2', accessor: 'options' },
+    { Header: 'Option_3', accessor: 'options' },
+    { Header: 'Option_4', accessor: 'options' },
+    { Header: 'Solution', accessor: 'is_correct' },
+    { Header: 'Actions', accessor: 'actions' },
+  ];
+
+  const data = questions.map((q) => ({
+    id: q.id,
+    text: q.text,
+    actions: (
+      <div className="table-actions">
+        <Link to={`/professor/questions/edit/${q.id}`} className="action-link">Edit</Link>
+        <button onClick={() => handleDelete(q.id)} className="action-button-delete">Delete</button>
+      </div>
+    ),
+  }));
+
   return (
     <main className="main-content">
       <div className="header-row" style={styles.headerRow}>

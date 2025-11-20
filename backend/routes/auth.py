@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from flask_cors import cross_origin
+# from flask_cors import cross_origin
 from ..services.auth_service import AuthService
 
 # Blueprint
@@ -39,15 +39,12 @@ def signup():
         return jsonify({"message": "An internal server error occurred"}), 500
 
 # ----------------- Login -----------------
-@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
-@cross_origin(origins=ALLOWED_ORIGINS, supports_credentials=True)
+@auth_bp.route('/login', methods=['POST'])
+# @cross_origin()
 def login():
-    print("LOG: Login function entry (POST or OPTIONS)")
-    if request.method == 'OPTIONS':
-        print("LOG: Handling OPTIONS request")
-        return jsonify({'status': 'OK'}), 200
-    
-    print("LOG: Login route reached successfully!")
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
+
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -74,21 +71,21 @@ def login():
         return jsonify({"message": "Invalid credentials"}), 401
 
 # ----------------- Logout -----------------
-@auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
-@cross_origin(origins=ALLOWED_ORIGINS, supports_credentials=True)
+@auth_bp.route('/logout', methods=['POST'])
+# @cross_origin()
 def logout():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     session.clear()
     return jsonify({"message": "Logout successful"}), 200
 
 # ----------------- Get Profile -----------------
-@auth_bp.route('/profile', methods=['GET', 'OPTIONS'])
-@cross_origin(origins=ALLOWED_ORIGINS, supports_credentials=True)
+@auth_bp.route('/profile', methods=['GET'])
+# @cross_origin()
 def get_profile():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     if session.get('logged_in'):
         user_id = session.get('user_id')
