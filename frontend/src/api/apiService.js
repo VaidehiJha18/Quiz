@@ -1,7 +1,7 @@
 // src/api/apiService.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
+const API_BASE_URL = 'http://localhost:5000'; 
 
 // Generic API service
 export const api = axios.create({
@@ -11,7 +11,7 @@ export const api = axios.create({
 
 // Auth endpoints
 export const loginUser = (data) => api.post('/auth/login', data);
-export const registerUser = (data) => api.post('/auth/register', data);
+export const registerUser = (data) => api.post('/auth/signup', data); 
 
 // Quiz endpoints
 export const fetchQuizzes = () => api.get('/quizzes');
@@ -23,3 +23,4 @@ export const fetchQuestions = () => api.get('/questions');
 export const addQuestion = (data) => api.post('prof/add_questions', data);
 export const updateQuestion = (id, data) => api.put(`/questions/${id}`, data);
 export const deleteQuestion = (id) => api.delete(`/questions/${id}`);
+
