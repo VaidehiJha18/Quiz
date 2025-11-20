@@ -6,8 +6,15 @@ import { addQuestion, updateQuestion, fetchQuestions } from '../api/apiService';
 
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({ text: '', options: '', correct: '' });
+  // const navigate = useNavigate();
+
+  // options is an array of 4 strings.
+  // 'correct' will now store the INDEX as a string ("0", "1", "2", "3")
+  const [formData, setFormData] = useState({ 
+    text: '', 
+    options: ['', '', '', ''], 
+    correct: '' 
+  });
 
   useEffect(() => {
     if (!isNew && questionId) {
@@ -16,10 +23,18 @@ export default function EditQuestionPage({ isNew }) {
           const res = await fetchQuestions();
           const q = res.data.find((item) => item.id === parseInt(questionId));
           if (q) {
+            const loadedOptions = q.options || [];
+            while (loadedOptions.length < 4) loadedOptions.push("");
+
+            // ✅ CHANGE 1: Find which index matches the correct answer text
+            // If the correct answer is "Blue" and "Blue" is in Option 2 (index 1),
+            // we set correctIndex to "1".
+            const correctIndex = loadedOptions.indexOf(q.correct);
+
             setFormData({
               text: q.text,
-              options: q.options.join(', '),
-              correct: q.correct,
+              options: loadedOptions,
+              correct: correctIndex > -1 ? correctIndex.toString() : '', 
             });
           }
         } catch (err) {
@@ -30,39 +45,109 @@ export default function EditQuestionPage({ isNew }) {
     }
   }, [isNew, questionId]);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleTextChange = (e) => {
+    setFormData({ ...formData, text: e.target.value });
+  };
+
+  const handleOptionChange = (index, value) => {
+    const newOptions = [...formData.options];
+    newOptions[index] = value;
+    setFormData({ ...formData, options: newOptions });
+  };
+
+  const handleCorrectChange = (e) => {
+    setFormData({ ...formData, correct: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      text: formData.text,
-      options: formData.options.split(',').map((opt) => opt.trim()),
-      correct: formData.correct,
-    };
-    try {
-      if (isNew) {
-        await addQuestion(payload);
-      } else {
-        await updateQuestion(questionId, payload);
-      }
-      alert('Question saved successfully!');
-      navigate('/professor/question');
-    } catch (err) {
-      alert('Error saving question.');
+    
+    const cleanOptions = formData.options.filter(opt => opt.trim() !== "");
+
+    // Basic Validation
+    if(cleanOptions.length < 2) {
+        alert("Please provide at least 2 options.");
+        return;
     }
+    if(formData.correct === '') {
+        alert("Please select which option is the correct answer.");
+        return;
+    }
+    // ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
+    const dataToSend = {
+        text: formData.text, 
+        options: cleanOptions, 
+        correct_index: formData.correct, 
+        question_type: 'MCQ',
+        unit: 1, 
+        marks: 1, 
+    };
+
+    try {
+        const response = await addQuestion(dataToSend); 
+        alert("Question saved successfully!");
+    } catch (error) {
+        console.error("Failed to add question:", error.response ? error.response.data : error.message);
+        alert("Error saving question. Please try again.");
+    }
+    // ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
   };
 
   return (
-    // ✅ Use the 'main-content' class here
     <main className="main-content">
       <div className="card form-container">
         <form onSubmit={handleSubmit}>
           <h2 className="page-title">
             {isNew ? 'Add New Question' : 'Edit Question'}
           </h2>
-          <FormInput label="Question Text" name="text" value={formData.text} onChange={handleChange} />
-          <FormInput label="Options (comma separated)" name="options" value={formData.options} onChange={handleChange} />
-          <FormInput label="Correct Answer" name="correct" value={formData.correct} onChange={handleChange} />
+
+          <FormInput 
+            label="Question Text" 
+            name="text" 
+            value={formData.text} 
+            onChange={handleTextChange} 
+          />
+
+          <h4 style={{marginTop: '20px', marginBottom: '10px'}}>Options</h4>
+          
+          {/* Loop to create 4 Input Boxes */}
+          {formData.options.map((option, index) => (
+            <FormInput
+              key={index}
+              label={`Option ${index + 1}`}
+              name={`option-${index}`}
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+            />
+          ))}
+
+          {/* ✅ CHANGE 3: The Dropdown now shows "Option 1, Option 2..." */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Correct Answer
+            </label>
+            <select
+              value={formData.correct}
+              onChange={handleCorrectChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '5px',
+                border: '1px solid #ccc',
+                backgroundColor: '#fff'
+              }}
+            >
+              <option value="">-- Select Correct Answer --</option>
+              
+              {/* We simply hardcode indices 0, 1, 2, 3 map them to Option Labels */}
+              {formData.options.map((_, index) => (
+                 <option key={index} value={index}>
+                    Option {index + 1}
+                 </option>
+              ))}
+            </select>
+          </div>
+
           <Button
             type="submit"
             label="Save Question"

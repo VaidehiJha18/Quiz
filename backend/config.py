@@ -7,7 +7,7 @@ import pymysql
 #         user='avnadmin',
 #         password='AVNS_IGyQyvOs9EJELlKx9h4',
 #         database='dbquiz',
-#         port=26056
+#         port=260565
 #     )
 #     print("Successfully connected to the database using PyMySQL!")
 

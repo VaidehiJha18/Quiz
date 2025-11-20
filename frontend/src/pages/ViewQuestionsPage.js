@@ -29,6 +29,11 @@ export default function ViewQuestionsPage() {
   const columns = [
     { Header: 'ID', accessor: 'id' },
     { Header: 'Question', accessor: 'text' },
+    { Header: 'Option_1', accessor: 'options' },
+    { Header: 'Option_2', accessor: 'options' },
+    { Header: 'Option_3', accessor: 'options' },
+    { Header: 'Option_4', accessor: 'options' },
+    { Header: 'Solution', accessor: 'is_correct' },
     { Header: 'Actions', accessor: 'actions' },
   ];
 

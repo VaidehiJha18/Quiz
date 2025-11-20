@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from flask_cors import cross_origin
+# from flask_cors import cross_origin
 from ..services.auth_service import AuthService
 
 # Blueprint
@@ -9,11 +9,11 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 auth_service = AuthService()
 
 # ----------------- Signup -----------------
-@auth_bp.route('/signup', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/signup', methods=['POST'])
+# @cross_origin()
 def signup():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     data = request.get_json()
     name = data.get('name')  # match frontend
@@ -36,11 +36,11 @@ def signup():
         return jsonify({"message": "An internal server error occurred"}), 500
 
 # ----------------- Login -----------------
-@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/login', methods=['POST'])
+# @cross_origin()
 def login():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     data = request.get_json()
     email = data.get('email')
@@ -68,21 +68,21 @@ def login():
         return jsonify({"message": "Invalid credentials"}), 401
 
 # ----------------- Logout -----------------
-@auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/logout', methods=['POST'])
+# @cross_origin()
 def logout():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     session.clear()
     return jsonify({"message": "Logout successful"}), 200
 
 # ----------------- Get Profile -----------------
-@auth_bp.route('/profile', methods=['GET', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/profile', methods=['GET'])
+# @cross_origin()
 def get_profile():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     if session.get('logged_in'):
         user_id = session.get('user_id')
