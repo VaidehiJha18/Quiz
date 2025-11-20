@@ -771,3 +771,19 @@ div[style*="flex-direction: column"] {
   padding: 2rem 3rem;
   width: 100%; /* Add this to help with layout calculations */
 }
+
+/* --- Table/Wide Card Overrides --- */
+
+/* This class overrides the default small card width */
+.card.table-container {
+  max-width: 100%;      /* Allow it to fill the screen */
+  width: 100%;          /* Force full width */
+  padding: 0;           /* Remove padding from the card wrapper so the scrollbar hits the edge */
+  overflow: hidden;     /* Keeps the border radius clean */
+}
+
+/* Ensure the internal table styling from the previous step works with CSS */
+.card.table-container .custom-table {
+  width: 100%;
+  min-width: 800px;     /* Ensures the table doesn't squish on small screens */
+}
