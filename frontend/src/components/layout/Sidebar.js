@@ -22,7 +22,9 @@ export default function Sidebar() {
           {/* NavLink adds an "active" class to the current page's link */}
           <NavLink to="/professor/dashboard" className="sidebar-nav-link">Home Page</NavLink>
           <NavLink to="/professor/quizzes" className="sidebar-nav-link">View Quiz</NavLink>
-          <NavLink to="/professor/questions/add" className="sidebar-nav-link">Generate Quiz</NavLink>
+          {/* <NavLink to="/professor/questions/add" className="sidebar-nav-link">Generate Quiz</NavLink> */}
+          <NavLink to="/professor/generate-quiz" className="sidebar-nav-link">Generate Quiz</NavLink>
+          {/* <Link to="/professor/generate-quiz">Generate Quiz</Link> */}
           <NavLink to="/professor/results" className="sidebar-nav-link">Results</NavLink>
         </nav>
       </div>

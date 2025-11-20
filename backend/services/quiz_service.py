@@ -5,7 +5,7 @@ import pymysql
 from flask import session
 from datetime import datetime, timedelta
 import uuid
-
+import random
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField
 from wtforms.validators import DataRequired 
@@ -117,6 +117,11 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
+
+    #try:
+    questions_with_options = fetch_questions(creator_email)
+    
+    #  Sample only a few questions
     try:    
         cursor.execute("SELECT id FROM question_bank")
         all_questions = cursor.fetchall()
@@ -131,6 +136,8 @@ def generate_and_save_quiz(teacher_id):
 
         unique_link_id = str(uuid.uuid4())
         quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # or get quiz_title from user
+        # quiz_title = f"{ user_title } - {datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         sql_quiz = """
             INSERT INTO generated_quizzes 
