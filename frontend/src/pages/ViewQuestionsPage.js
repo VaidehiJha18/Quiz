@@ -87,25 +87,20 @@ export default function ViewQuestionsPage() {
   const loadQuestions = async () => {
     try {
       const res = await fetchQuestions();
-      
-      // 🔍 DEBUGGING: Check your browser console (F12) to see what the API returns
-      console.log("API Response:", res);
+      console.log("✅ Data received from API (res.data):", res.data);
 
-      // SAFE DATA HANDLING:
-      // If your backend returns the array directly in res.data:
-      if (Array.isArray(res.data)) {
-        setQuestions(res.data);
-      } 
-      // If your backend returns { questions: [...] } inside res.data:
-      else if (res.data && Array.isArray(res.data.questions)) {
-        setQuestions(res.data.questions);
-      } 
-      else {
-        setQuestions([]); // Fallback to empty if format is unexpected
-      }
+      // 🛑 CRITICAL FIX: Convert the backend object to an array 🛑
+      if (res.data && typeof res.data === 'object') {
+            const questionsArray = Object.values(res.data);
+            setQuestions(questionsArray);
+            console.log("✅ Questions set as array (questionsArray):", questionsArray.length);
+        } else {
+            setQuestions([]);
+        }
 
     } catch (err) {
-      console.error("Failed to load questions", err);
+      console.error("❌ Error fetching questions:", err);
+      setQuestions([]);
     }
   };
 
@@ -131,25 +126,38 @@ export default function ViewQuestionsPage() {
 
   const columns = [
     { Header: 'ID', accessor: 'id' },
-    { Header: 'Question', accessor: 'text' },
-    { Header: 'Option_1', accessor: 'options' },
-    { Header: 'Option_2', accessor: 'options' },
-    { Header: 'Option_3', accessor: 'options' },
-    { Header: 'Option_4', accessor: 'options' },
-    { Header: 'Solution', accessor: 'is_correct' },
+    { Header: 'Question', accessor: 'question_txt' },
+    { Header: 'Option_1', accessor: 'option_1_txt' },
+    { Header: 'Option_2', accessor: 'option_2_txt' },
+    { Header: 'Option_3', accessor: 'option_3_txt' },
+    { Header: 'Option_4', accessor: 'option_4_txt' },
+    { Header: 'Solution', accessor: 'solution_text' },
     { Header: 'Actions', accessor: 'actions' },
   ];
 
-  const data = questions.map((q) => ({
-    id: q.id,
-    text: q.text,
-    actions: (
-      <div className="table-actions">
-        <Link to={`/professor/questions/edit/${q.id}`} className="action-link">Edit</Link>
-        <button onClick={() => handleDelete(q.id)} className="action-button-delete">Delete</button>
-      </div>
-    ),
-  }));
+  const data = questions.map((q) => {
+    const solutionOption = q.options.find(opt => opt.is_correct === 1);
+    const optionTexts = q.options.map(opt => opt.option_text);
+
+    return {
+      id: q.question_id,
+      question_txt: q.question_txt,
+      option_1_txt: optionTexts[0] || '',
+      option_2_txt: optionTexts[1] || '',
+      option_3_txt: optionTexts[2] || '',
+      option_4_txt: optionTexts[3] || '',
+      solution_text: solutionOption ? solutionOption.option_text : 'N/A',
+      actions: (
+        <div className="table-actions">
+          <Link to={`/professor/questions/edit/${q.question_id}`} className="action-link">Edit</Link>
+          <button onClick={() => handleDelete(q.question_id)} className="action-button-delete">Delete</button>
+        </div>
+      ),
+    };
+  });
+
+  // 🎯 ADDED CONSOLE LOG HERE: Log the processed data that is passed to the Table component
+  console.log("✅ Data processed for Table (data):", data);
 
   return (
     <main className="main-content">

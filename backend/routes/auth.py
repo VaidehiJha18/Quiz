@@ -56,7 +56,8 @@ def login():
 
     if user:
         session['logged_in'] = True
-        session['user_id'] = user.id
+        session['id'] = user.id
+        session['user_id'] = user.id     # keeping here for backward compatibility if needed
         session['username'] = user.username
         session['role'] = getattr(user, 'role', 'student')
         return jsonify({
@@ -88,7 +89,7 @@ def get_profile():
     #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     if session.get('logged_in'):
-        user_id = session.get('user_id')
+        user_id = session.get('id')
         user_details = auth_service.get_user_by_id(user_id)
         return jsonify({
             "user_id": user_details.id,

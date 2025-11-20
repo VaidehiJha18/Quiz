@@ -131,7 +131,7 @@ def fetch_questions(employee_id, fetch_scope='creator'):
 
     print(questions_with_options)
 
-    return list(questions_with_options.values()) 
+    return questions_with_options
         
 # 3. Generate and Save Quiz
 def generate_and_save_quiz(teacher_id):

@@ -5,6 +5,7 @@ from .config import Config
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
 
     # ✅ Enable CORS for all routes - support both localhost and 127.0.0.1
     CORS(app, 

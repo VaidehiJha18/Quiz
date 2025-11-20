@@ -1,11 +1,18 @@
 from flask import Blueprint, session, redirect, url_for, flash, jsonify, request
 from ..services import quiz_service # Import the quiz logic
 from ..services.auth_service import AuthService # Import to get user data if needed
+from functools import wraps
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
 def professor_required(f):
+    @wraps(f)
     def wrap(*args, **kwargs):
+        # ⚠️ DIAGNOSTIC PRINTS START ⚠️
+        print(f"DEBUG: Session contents: {session.items()}")
+        print(f"DEBUG: Role found: '{session.get('role')}'")
+        # ⚠️ DIAGNOSTIC PRINTS END ⚠️
+
         if session.get('role') != 'professor':
             return jsonify({"message": "Unauthorized"}), 403 # Return JSON for React
         return f(*args, **kwargs)
@@ -93,6 +100,23 @@ def get_questions_api():
             return jsonify({"message": "User ID not found in session."}), 400
 
         questions = quiz_service.fetch_questions(employee_id, fetch_scope='creator')
+        if questions is None:
+            print("WARNING: quiz_service.fetch_questions returned None. Returning empty object {}")
+            questions = {}
+            
         return jsonify(questions), 200
     except Exception as e:
         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
+    
+# @professor_bp.route('/questions', methods=['GET'])
+# def get_question_bank():
+#     try:
+#         employee_id = session.get('id')
+#         if not employee_id:
+#             return jsonify({"message": "User ID not found in session."}), 400
+        
+#         questions = quiz_service.fetch_questions(employee_id, fetch_scope='bank')
+#         return jsonify(questions), 200
+#     except Exception as e:
+#         return jsonify({"message": f"Error fetching question bank: {str(e)}"}), 500
+
