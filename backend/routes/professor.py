@@ -2,6 +2,7 @@ from flask import Blueprint, session, redirect, url_for, flash, jsonify, request
 from ..services import quiz_service # Import the quiz logic
 from ..services.auth_service import AuthService # Import to get user data if needed
 
+
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
 def professor_required(f):
@@ -91,3 +92,83 @@ def get_questions_api():
         return jsonify(questions), 200
     except Exception as e:
         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
+    
+    #adding my code
+    # --- PASTE THIS AT THE BOTTOM OF routes/professor.py ---
+
+from flask import request, jsonify
+# Make sure 'mysql' is imported at the top of your file. 
+# If it's not, add: from ..extensions import mysql 
+# (or however you import your db connection in this file)
+
+@professor_bp.route('/schools', methods=['GET'])
+def get_schools():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, school_name FROM schools") # Matches your image
+    data = cur.fetchall()
+    cur.close()
+    
+    # Convert to list
+    schools_list = [{'id': row[0], 'school_name': row[1]} for row in data]
+    return jsonify(schools_list)
+
+@professor_bp.route('/programs', methods=['GET'])
+def get_programs():
+    school_id = request.args.get('school_id')
+    cur = mysql.connection.cursor()
+    # Matches your image: program_name
+    cur.execute("SELECT id, program_name FROM programs WHERE school_id = %s", (school_id,))
+    data = cur.fetchall()
+    cur.close()
+    
+    programs_list = [{'id': row[0], 'program_name': row[1]} for row in data]
+    return jsonify(programs_list)
+
+@professor_bp.route('/departments', methods=['GET'])
+def get_departments():
+    program_id = request.args.get('program_id')
+    cur = mysql.connection.cursor()
+    # Matches your text: name
+    cur.execute("SELECT id, name FROM departments WHERE program_id = %s", (program_id,))
+    data = cur.fetchall()
+    cur.close()
+    
+    dept_list = [{'id': row[0], 'name': row[1]} for row in data]
+    return jsonify(dept_list)
+
+@professor_bp.route('/courses', methods=['GET'])
+def get_courses():
+    dept_id = request.args.get('dept_id')
+    semester = request.args.get('semester')
+    
+    cur = mysql.connection.cursor()
+    # Matches your text: course_name
+    cur.execute("SELECT id, course_name FROM courses WHERE department_id = %s AND semester = %s", (dept_id, semester))
+    data = cur.fetchall()
+    cur.close()
+    
+    course_list = [{'id': row[0], 'course_name': row[1]} for row in data]
+    return jsonify(course_list)
+
+@professor_bp.route('/questions', methods=['GET'])
+def get_questions_by_course():
+    course_id = request.args.get('course_id')
+    
+    cur = mysql.connection.cursor()
+    query = "SELECT id, question_text, option_1, option_2, option_3, option_4, correct_answer FROM questions WHERE course_id = %s"
+    cur.execute(query, (course_id,))
+    data = cur.fetchall()
+    cur.close()
+    
+    questions_list = []
+    for row in data:
+        questions_list.append({
+            'id': row[0],
+            'text': row[1],
+            'options': [row[2], row[3], row[4], row[5]],
+            'correct': row[6]
+        })
+        
+    return jsonify(questions_list)
+
+#pri

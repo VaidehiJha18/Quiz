@@ -24,3 +24,14 @@ export const addQuestion = (data) => api.post('/questions', data);
 export const updateQuestion = (id, data) => api.put(`/questions/${id}`, data);
 export const deleteQuestion = (id) => api.delete(`/questions/${id}`);
 
+// --- Dropdown API Calls ---[pri]
+
+export const fetchSchools = () => api.get('/prof/schools');
+
+export const fetchPrograms = (schoolId) => api.get(`/prof/programs?school_id=${schoolId}`);
+
+export const fetchDepartments = (programId) => api.get(`/prof/departments?program_id=${programId}`);
+
+export const fetchCourses = (deptId, semester) => api.get(`/prof/courses?dept_id=${deptId}&semester=${semester}`);
+
+export const fetchQuestionsByCourse = (courseId) => api.get(`/prof/questions?course_id=${courseId}`);
