@@ -13,7 +13,6 @@ from wtforms.validators import DataRequired
 class QuestionForm(FlaskForm):
     pass 
 
-
 # 1. Database Add Question
 def insert_question(form_data, teacher_id): 
     conn = get_db_connection()
@@ -224,24 +223,26 @@ def generate_and_save_quiz(teacher_id):
         cursor.close()
         conn.close()
 
+
+# ==============================================================================================
 # if __name__ == "__main__":
 #     app = create_app()
-    # with app.app_context():
-        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
-        # Testing fetch_questions 
-        # test_employee_id = 1
-        # test_scope = 'creator'
-        # print(fetch_questions(test_employee_id, test_scope))
+#     with app.app_context():
+#         🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+#         Testing fetch_questions 
+#         test_employee_id = 1
+#         test_scope = 'creator'
+#         print(fetch_questions(test_employee_id, test_scope))
 
-        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
-        # Example, Testing data
-        # form_data = {
-        #     'question_txt': 'What is the capital of Germany?', 
-        #     'options': ['Berlin', 'Munich', 'Frankfurt', 'Hamburg'],
-        #     'correct': '0'
-        # }
+#         🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+#         Example, Testing data
+#         form_data = {
+#             'question_txt': 'What is the capital of Germany?', 
+#             'options': ['Berlin', 'Munich', 'Frankfurt', 'Hamburg'],
+#             'correct': '0'
+#         }
         
-        # insert_question(form_data)
+#         insert_question(form_data)
 
-        # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
-        # Testing generate_and_save_quiz
+#         🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+#         Testing generate_and_save_quiz
