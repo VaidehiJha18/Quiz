@@ -6,10 +6,7 @@ import { addQuestion, updateQuestion, fetchQuestions } from '../api/apiService';
 
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
-  // const navigate = useNavigate();
 
-  // options is an array of 4 strings.
-  // 'correct' will now store the INDEX as a string ("0", "1", "2", "3")
   const [formData, setFormData] = useState({ 
     text: '', 
     options: ['', '', '', ''], 
@@ -27,7 +24,6 @@ export default function EditQuestionPage({ isNew }) {
             const loadedOptions = q.options || [];
             while (loadedOptions.length < 4) loadedOptions.push("");
 
-            // Find which index matches the correct answer text
             const correctIndex = loadedOptions.indexOf(q.correct);
 
             setFormData({
@@ -65,7 +61,6 @@ export default function EditQuestionPage({ isNew }) {
     
     const cleanOptions = formData.options.filter(opt => opt.trim() !== "");
 
-    // Basic Validation
     if(cleanOptions.length < 2) {
         alert("Please provide at least 2 options.");
         return;

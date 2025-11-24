@@ -66,7 +66,12 @@ def add_question_api():
         return jsonify({"message": f"Missing required fields"}), 400
 
     try:
-        quiz_service.insert_questions(data, session.get('email'))
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        # quiz_service.insert_questions(data, session.get('email'))
+        quiz_service.insert_question(data, teacher_id)
         return jsonify({"message": "Question added successfully!"}), 201
         
     except Exception as e:

@@ -15,12 +15,13 @@ class QuestionForm(FlaskForm):
 
 
 # 1. Database Add Question
-def insert_question(form_data): #add email parameter later
+def insert_question(form_data, teacher_id): 
     conn = get_db_connection()
     cursor = conn.cursor()
     DEFAULT_TYPE = "MCQ"
     DEFAULT_UNIT = 1
     DEFAULT_MARKS = 1
+    DEFAULT_COURSE_ID = 21 #for now
 
     sql_insert_question_bank = """
         INSERT INTO question_bank (question_txt, question_type, unit, marks)
@@ -32,16 +33,33 @@ def insert_question(form_data): #add email parameter later
         VALUES (%s, %s, %s)
     """
 
+    sql_link_question_to_course = """
+        INSERT INTO question_course (question_id, course_id)
+        VALUES (%s, %s)
+    """
+
+    # ✅ NEW: SQL to link question to the creator (teacher)
+    sql_link_question_to_creator = """
+        INSERT INTO question_employee (question_id, employee_id)
+        VALUES (%s, %s)
+    """
+    
+    # ✅ NEW: SQL to link question to the default course
+    sql_link_question_to_course = """
+        INSERT INTO question_course (question_id, course_id)
+        VALUES (%s, %s)
+    """
+
     try:
         cursor.execute(sql_insert_question_bank, (
-            form_data['question_txt'], 
+            form_data['text'], 
             DEFAULT_TYPE,  
             DEFAULT_UNIT,  
             DEFAULT_MARKS,
         ))
 
         new_question_id = cursor.lastrowid
-        correct_index = int(form_data['correct'])
+        correct_index = int(form_data['correct_index'])
 
         for index, option_text in enumerate(form_data['options']):
             is_correct_flag = 1 if index == correct_index else 0
@@ -51,6 +69,12 @@ def insert_question(form_data): #add email parameter later
                 is_correct_flag,
             ))
 
+        # ✅ NEW: Link question to the teacher
+        cursor.execute(sql_link_question_to_creator, (new_question_id, teacher_id))
+        
+        # ✅ NEW: Link question to the default course
+        cursor.execute(sql_link_question_to_course, (new_question_id, DEFAULT_COURSE_ID))
+
         print(f"Inserted question ID: {new_question_id} with options.")
 
         conn.commit() 
@@ -58,6 +82,7 @@ def insert_question(form_data): #add email parameter later
     except Exception as e:
         conn.rollback() 
         print(f"Database error: {e}")
+        raise
 
     finally:
         cursor.close()
@@ -96,10 +121,11 @@ def fetch_questions(employee_id, fetch_scope='creator'):
                 qe.employee_id = %s 
                 AND qc.course_id = %s
         """
-        # q.question_type not included
-        # Possible additions: Select by Unit, question_type etc.
 
-        cursor.execute(select_clause, (emp_id, course_id)) # dictionary=True is very helpful
+        select_params = (emp_id, course_id)
+        print(f"DEBUG: SQL Params: {select_params}, Types: {type(emp_id), type(course_id)}")
+
+        cursor.execute(select_clause, (emp_id, course_id)) 
         results = cursor.fetchall()
 
     except Exception as e:
@@ -141,10 +167,7 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
-    # try:
-    questions_with_options = fetch_questions(creator_email)
-    
-    #  Sample only a few questions
+   
     try:    
         cursor.execute("SELECT id FROM question_bank")
         all_questions = cursor.fetchall()
@@ -159,8 +182,6 @@ def generate_and_save_quiz(teacher_id):
 
         unique_link_id = str(uuid.uuid4())
         quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
-        # or get quiz_title from user
-        # quiz_title = f"{ user_title } - {datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         sql_quiz = """
             INSERT INTO generated_quizzes 

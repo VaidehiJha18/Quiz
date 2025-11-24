@@ -28,8 +28,5 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'default-dev-secret-key')
     DEBUG = True
 
-    # Session / CORS settings for cross-origin requests
-    # SESSION_COOKIE_DOMAIN = "localhost"
-    # SESSION_COOKIE_SAMESITE = "None"     # Needed for cross-origin cookies
-    SESSION_COOKIE_SECURE = False        # Set True only for HTTPS
+    SESSION_COOKIE_SECURE = False  
     
