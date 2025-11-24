@@ -14,7 +14,6 @@ import pymysql
 # except pymysql.MySQLError as e:
 #     print(f"Failed to connect to the database: {e}")
     
-    
 
 class Config:
     # Database
