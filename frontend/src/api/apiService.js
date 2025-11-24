@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 // const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
@@ -23,3 +24,4 @@ export const fetchQuestions = () => api.get('/prof/questions');
 export const addQuestion = (data) => api.post('/prof/add_questions', data);
 export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
 export const deleteQuestion = (id) => api.delete(`/prof/questions/${id}`);
+
