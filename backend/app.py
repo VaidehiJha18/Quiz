@@ -17,7 +17,8 @@ def create_app(config_class=Config):
     print("=" * 50)
     app.config.update(
         SESSION_COOKIE_SECURE = True,
-        SESSION_COOKIE_SAMESITE = 'Lax'
+        SESSION_COOKIE_SAMESITE = 'Lax',
+        SESSION_COOKIE_DOMAIN = os.environ.get('BACKEND_HOST', None)
         # SECRET_KEY=app.config.get('SECRET_KEY')
     )
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
