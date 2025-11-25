@@ -257,6 +257,7 @@
 
 
 import React, { useEffect, useState } from 'react';
+// import { useNavigate } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import FormInput from '../components/forms/FormInput';
 import Button from '../components/forms/Button';
@@ -264,10 +265,8 @@ import { addQuestion, updateQuestion, fetchQuestions } from '../api/apiService';
 
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); //prii
 
-  // Options is an array of 4 strings.
-  // 'correct' stores the INDEX as a string ("0", "1", "2", "3")
   const [formData, setFormData] = useState({ 
     text: '', 
     options: ['', '', '', ''], 
