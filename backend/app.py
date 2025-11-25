@@ -25,7 +25,7 @@ def create_app(config_class=Config):
 
     # Enable CORS for all routes
     CORS(app, 
-         resources={r"/*": {"origins": FRONTEND_URL}}, 
+         resources={r"/*": {"origins": [FRONTEND_URL]}}, 
          supports_credentials=True)
     # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     
