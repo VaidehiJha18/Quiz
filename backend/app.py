@@ -1,6 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS  
 from .config import Config
+import os
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -18,9 +19,13 @@ def create_app(config_class=Config):
         SESSION_COOKIE_SECURE = False
         # SECRET_KEY=app.config.get('SECRET_KEY')
     )
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
     # Enable CORS for all routes
-    CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
+    CORS(app, 
+         resources={r"/*": {"origins": FRONTEND_URL}}, 
+         supports_credentials=True)
+    # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     
     # Register Blueprints
     from .routes.auth import auth_bp
