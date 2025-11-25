@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// import { useNavigate } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import FormInput from '../components/forms/FormInput';
 import Button from '../components/forms/Button';
@@ -11,6 +12,7 @@ import {
 import axios from 'axios'; //Vaidehi Changes
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
+  const navigate = useNavigate(); //prii
 
   const [formData, setFormData] = useState({ 
     text: '', 

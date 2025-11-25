@@ -26,3 +26,21 @@ export const addQuestion = (data) => api.post('/prof/add_questions', data);
 export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
 export const deleteQuestion = (id) => api.delete(`/prof/questions/${id}`);
 export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);//Vaidehi Changes
+
+
+// --- Dropdown API Calls (Add these to the bottom of apiService.js) ---
+
+// 1. Get Schools
+export const fetchSchools = () => api.get('/prof/schools');
+
+// 2. Get Programs (linked to School)
+export const fetchPrograms = (schoolId) => api.get(`/prof/programs?school_id=${schoolId}`);
+
+// 3. Get Departments (linked to Program)
+export const fetchDepartments = (programId) => api.get(`/prof/departments?program_id=${programId}`);
+
+// 4. Get Courses (linked to Dept & Semester)
+export const fetchCourses = (deptId, semester) => api.get(`/prof/courses?dept_id=${deptId}&semester=${semester}`);
+
+// 5. Get Questions (linked to Course)
+export const fetchQuestionsByCourse = (courseId) => api.get(`/prof/questions?course_id=${courseId}`);

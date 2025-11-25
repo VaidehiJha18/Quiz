@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchQuestions, deleteQuestion } from '../api/apiService'; 
+import { 
+  fetchSchools, fetchPrograms, fetchDepartments, fetchCourses, 
+  fetchQuestionsByCourse, deleteQuestion 
+} from '../api/apiService'; 
 import Button from '../components/forms/Button'; 
 import { Link } from 'react-router-dom';
 
@@ -23,9 +26,87 @@ export default function ViewQuestionsPage() {
       const questionsArray = Object.values(res.data);
       setQuestions(questionsArray);
       console.log("✅ Questions set as array (questionsArray):", questionsArray.length);
+  const navigate = useNavigate();
+  
+  // --- STATE ---
+  const [selections, setSelections] = useState({
+    school: '', program: '', department: '', semester: '', course: ''
+  });
+
+  const [lists, setLists] = useState({
+    schools: [], programs: [], departments: [], semesters: [1, 2, 3, 4, 5, 6, 7, 8], courses: []
+  });
+
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // --- LOAD INITIAL DATA ---
+  useEffect(() => {
+    loadSchools();
+  }, []);
+
+  const loadSchools = async () => {
+    try {
+      const res = await fetchSchools();
+      setLists(prev => ({ ...prev, schools: res.data || [] }));
+    } catch (err) { console.error(err); }
+  };
+
+  // --- HANDLERS ---
+  const handleSchoolChange = async (e) => {
+    const schoolId = e.target.value;
+    setSelections({ ...selections, school: schoolId, program: '', department: '', semester: '', course: '' });
+    setLists(prev => ({ ...prev, programs: [], departments: [], courses: [] })); 
+
+    if (schoolId) {
+      const res = await fetchPrograms(schoolId);
+      setLists(prev => ({ ...prev, programs: res.data || [] }));
+    }
+  };
+
+  const handleProgramChange = async (e) => {
+    const programId = e.target.value;
+    setSelections({ ...selections, program: programId, department: '', semester: '', course: '' });
+    setLists(prev => ({ ...prev, departments: [], courses: [] }));
+
+    if (programId) {
+      const res = await fetchDepartments(programId);
+      setLists(prev => ({ ...prev, departments: res.data || [] }));
+    }
+  };
+
+  const handleDeptChange = (e) => {
+    setSelections({ ...selections, department: e.target.value, semester: '', course: '' });
+    setLists(prev => ({ ...prev, courses: [] }));
+  };
+
+  const handleSemesterChange = async (e) => {
+    const sem = e.target.value;
+    setSelections({ ...selections, semester: sem, course: '' });
+    
+    if (selections.department && sem) {
+      const res = await fetchCourses(selections.department, sem);
+      setLists(prev => ({ ...prev, courses: res.data || [] }));
+    }
+  };
+
+  const handleCourseChange = async (e) => {
+    const courseId = e.target.value;
+    setSelections({ ...selections, course: courseId });
+    
+    if (courseId) {
+      setLoading(true);
+      try {
+        const res = await fetchQuestionsByCourse(courseId);
+        // Handle both array and dict formats
+        const data = Array.isArray(res.data) ? res.data : (res.data.questions || []);
+        setQuestions(data);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
     } else {
       setQuestions([]);
     }
+  };
 
   } catch (err) {
    console.error("❌ Error fetching questions:", err);
@@ -82,156 +163,198 @@ export default function ViewQuestionsPage() {
      <button onClick={() => handleDelete(question.question_id)} className="action-button-delete">Delete</button>
     </div>
    ),
+  const handleDelete = async (id) => {
+    if (window.confirm("Delete this question?")) {
+      await deleteQuestion(id);
+      setQuestions(questions.filter(q => q.id !== id));
+    }
   };
- });
 
- console.log("✅ Data processed for Table (data):", data);
+  return (
+    <main className="main-content" style={styles.mainContainer}>
+      
+      <div className="header-row" style={styles.headerRow}>
+        <h2 className="page-title">Question Bank</h2>
+        <Button 
+            label="Add Question" 
+            onClick={() => navigate('/professor/questions/add')} 
+            className="btn btn-primary"
+        />
+      </div>
 
- return (
-  <main className="main-content">
-   <div className="header-row" style={styles.headerRow}>
-    <h2 className="page-title">Question Bank</h2>
-    <Button 
-      label="Add Question" 
-      onClick={() => navigate('/professor/questions/add')} 
-      className="btn btn-primary"
-    />
-    </div>
+      {/* --- FILTER CARD (UPDATED LAYOUT) --- */}
+      <div style={styles.filterCard}>
+        <h3 style={{marginBottom: '20px', color: '#444'}}></h3>
+        
+        {/* ✅ GRID LAYOUT START */}
+        <div style={styles.gridContainer}>
+            
+            {/* Row 1: School & Department */}
+            <div style={styles.inputGroup}>
+                <label style={styles.label}>Select School:</label>
+                <select style={styles.select} value={selections.school} onChange={handleSchoolChange}>
+                    <option value="">Select a school</option>
+                    {lists.schools.map(item => <option key={item.id} value={item.id}>{item.school_name}</option>)}
+                </select>
+            </div>
 
-   <div className="card table-container" style={styles.tableContainer}>
-    <table className="custom-table" style={styles.table}>
-     <thead>
-      <tr style={styles.tableHeaderRow}>
-       <th style={styles.th}>ID</th>
-       <th style={styles.th}>Question</th>
-       <th style={styles.th}>Option 1</th>
-       <th style={styles.th}>Option 2</th>
-       <th style={styles.th}>Option 3</th>
-       <th style={styles.th}>Option 4</th>
-       <th style={styles.th}>Solution</th>
-       <th style={styles.th}>Actions</th>
-      </tr>
-     </thead>
-     <tbody>
-      {questions.length > 0 ? (
-       questions.map((question) => {
-                  const optionTexts = question.options.map(opt => opt.option_text);
-                  const solutionOption = question.options.find(opt => opt.is_correct === 1);
-                  const solutionText = solutionOption ? solutionOption.option_text : 'N/A';
+            <div style={styles.inputGroup}>
+                 <label style={styles.label}>Select Department:</label>
+                 <select style={styles.select} value={selections.department} onChange={handleDeptChange} disabled={!selections.program}>
+                    <option value="">Select a department</option>
+                    {lists.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+            </div>
 
-        return (
-        <tr key={question.question_id} style={styles.tableRow}>
-         {/* Use question_id */}
-         <td style={styles.td}>{question.question_id}</td>
-         
-         {}
-         <td style={styles.td}>{question.question_txt}</td>
-         
-         {/* Use optionTexts[index] for string content */}
-         <td style={styles.td}>{optionTexts[0] || '-'}</td>
-         <td style={styles.td}>{optionTexts[1] || '-'}</td>
-         <td style={styles.td}>{optionTexts[2] || '-'}</td>
-         <td style={styles.td}>{optionTexts[3] || '-'}</td>
-         
-         {/* Use calculated solutionText */}
-         <td style={{ ...styles.td, color: 'green', fontWeight: 'bold' }}>
-          {solutionText}
-         </td>
+            {/* Row 2: Program & Semester */}
+            <div style={styles.inputGroup}>
+                <label style={styles.label}>Select Program:</label>
+                <select style={styles.select} value={selections.program} onChange={handleProgramChange} disabled={!selections.school}>
+                    <option value="">Select a program</option>
+                    {lists.programs.map(item => <option key={item.id} value={item.id}>{item.program_name}</option>)}
+                </select>
+            </div>
 
-         {/* Actions - Use question_id for handlers */}
-         <td style={styles.td}>
-          <div style={{ display: 'flex', gap: '5px' }}>
-           <button 
-            onClick={() => handleEdit(question.question_id)}
-            style={styles.editBtn}
-            title="Edit Question"
-           >
-            Edit
-           </button>
-           <button 
-            onClick={() => handleDelete(question.question_id)}
-            style={styles.deleteBtn}
-            title="Delete Question"
-           >
-            Delete
-           </button>
-          </div>
-         </td>
-        </tr>
-        );
-       })
-      ) : (
-       <tr>
-        <td colSpan="8" style={{ padding: '20px', textAlign: 'center', fontStyle: 'italic' }}>
-         No data found. (Please add a question first)
-        </td>
-       </tr>
-      )}
-     </tbody>
-    </table>
-   </div>
-  </main>
- );
+            <div style={styles.inputGroup}>
+                <label style={styles.label}>Select Semester:</label>
+                <select style={styles.select} value={selections.semester} onChange={handleSemesterChange} disabled={!selections.department}>
+                    <option value="">Select a semester</option>
+                    {lists.semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
+                </select>
+            </div>
+
+            {/* Row 3: Course (Full Width) */}
+            <div style={{...styles.inputGroup, gridColumn: '1 / -1'}}>
+                <label style={styles.label}>Select Course:</label>
+                <select style={styles.select} value={selections.course} onChange={handleCourseChange} disabled={!selections.semester}>
+                    <option value="">Select a course</option>
+                    {lists.courses.map(item => <option key={item.id} value={item.id}>{item.course_name}</option>)}
+                </select>
+            </div>
+
+        </div>
+        {/* ✅ GRID LAYOUT END */}
+      </div>
+
+      {/* --- QUESTIONS TABLE --- */}
+      <div style={styles.tableCard}>
+        {loading ? <p style={{padding:'20px', textAlign:'center'}}>Loading...</p> : (
+        <table className="custom-table" style={styles.table}>
+          <thead>
+            <tr style={styles.tableHeaderRow}>
+              <th style={styles.th}>ID</th>
+              <th style={styles.th}>Question</th>
+              <th style={styles.th}>Option 1</th>
+              <th style={styles.th}>Option 2</th>
+              <th style={styles.th}>Option 3</th>
+              <th style={styles.th}>Option 4</th>
+              <th style={styles.th}>Solution</th>
+              <th style={styles.th}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {questions.length > 0 ? (
+              questions.map((q) => (
+                <tr key={q.id} style={styles.tableRow}>
+                  <td style={styles.td}>{q.id}</td>
+                  <td style={styles.td}>{q.text}</td>
+                  <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
+                  <td style={styles.td}>{q.options?.[1]?.option_text || '-'}</td>
+                  <td style={styles.td}>{q.options?.[2]?.option_text || '-'}</td>
+                  <td style={styles.td}>{q.options?.[3]?.option_text || '-'}</td>
+                  <td style={{ ...styles.td, color: 'green', fontWeight: 'bold' }}>
+                    {q.options?.find(opt => opt.is_correct === 1)?.option_text || 'N/A'}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => navigate(`/professor/questions/edit/${q.id}`)} style={styles.editBtn}>Edit</button>
+                        <button onClick={() => handleDelete(q.id)} style={styles.deleteBtn}>Del</button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" style={{ padding: '30px', textAlign: 'center', color: '#777' }}>
+                  {selections.course ? "No questions found." : "Please select a Course to view questions."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        )}
+      </div>
+    </main>
+  );
 }
 
+// --- UPDATED STYLES ---
 const styles = {
- headerRow: {
-  display: 'flex', 
-  justifyContent: 'space-between', 
-  alignItems: 'center', 
-  marginBottom: '20px'
- },
- tableContainer: {
-  width: '100%',       
-  overflowX: 'auto',    
-  backgroundColor: '#fff',  
-  borderRadius: '10px',   
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', 
-  padding: '20px',     
-  boxSizing: 'border-box' 
- },
- table: {
-  width: '100%',      
-  minWidth: '800px',   
-  borderCollapse: 'collapse',
-  fontSize: '0.9rem' 
- },
- tableHeaderRow: {
-  backgroundColor: '#f8f9fa',
-  borderBottom: '2px solid #dee2e6',
-  textAlign: 'left'
- },
- th: {
-  padding: '15px 10px',   // More breathing room in headers
-  fontWeight: '600',
-  color: '#495057',
-  whiteSpace: 'nowrap'    
- },
- tableRow: {
-  borderBottom: '1px solid #dee2e6'
- },
- td: {
-  padding: '12px 10px',
-  verticalAlign: 'middle'
- },
- editBtn: {
-  backgroundColor: '#ffc107',
-  color: '#212529',
-  border: 'none',
-  padding: '6px 12px',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-  fontWeight: 'bold'
- },
- deleteBtn: {
-  backgroundColor: '#dc3545',
-  color: '#fff',
-  border: 'none',
-  padding: '6px 12px',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-  fontWeight: 'bold'
- }
+  mainContainer: {
+    padding: '30px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    boxSizing: 'border-box'
+  },
+  headerRow: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: '25px' 
+  },
+  
+  // FILTER CARD STYLES
+  filterCard: {
+    backgroundColor: '#fff',
+    padding: '30px',
+    borderRadius: '12px',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
+    marginBottom: '30px',
+    width: '100%',
+    boxSizing: 'border-box'
+  },
+  gridContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr', // 2 Columns
+    gap: '20px', 
+  },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  label: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '0.9rem',
+    marginLeft: '2px'
+  },
+  select: {
+    padding: '12px',
+    borderRadius: '8px',
+    border: '1px solid #e0e0e0',
+    fontSize: '1rem',
+    backgroundColor: '#f9f9f9',
+    width: '100%',
+    outline: 'none',
+    cursor: 'pointer'
+  },
+
+  // TABLE STYLES
+  tableCard: {
+    backgroundColor: '#fff',
+    padding: '20px',
+    borderRadius: '12px',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
+    width: '100%',
+    overflowX: 'auto',
+    boxSizing: 'border-box'
+  },
+  table: { width: '100%', minWidth: '800px', borderCollapse: 'collapse', fontSize: '0.95rem' },
+  tableHeaderRow: { backgroundColor: '#f8f9fa', borderBottom: '2px solid #eaeaea', textAlign: 'left' },
+  th: { padding: '16px 12px', fontWeight: '600', color: '#555', whiteSpace: 'nowrap' },
+  tableRow: { borderBottom: '1px solid #f0f0f0' },
+  td: { padding: '14px 12px', verticalAlign: 'middle', color: '#333' },
+  editBtn: { backgroundColor: '#ffc107', color: '#212529', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginRight: '5px' },
+  deleteBtn: { backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }
 };
