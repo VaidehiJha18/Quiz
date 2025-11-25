@@ -57,14 +57,14 @@ def login():
 
         session['id'] = master_id if master_id else user.id
 
-        session['user_id'] = user.id     # keeping here for backward compatibility if needed
+        session['user_id'] = user.master_id     # keeping here for backward compatibility if needed
         session['username'] = user.username
         session['role'] = getattr(user, 'role', 'student')
         
         return jsonify({
             "message": "Login successful",
             "user": {
-                "id": user.id,
+                "id": user.master_id,
                 "name": user.username,
                 "role": session['role']
             }
