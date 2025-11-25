@@ -8,6 +8,24 @@ import Button from '../components/forms/Button';
 import { Link } from 'react-router-dom';
 
 export default function ViewQuestionsPage() {
+ const [questions, setQuestions] = useState([]);
+ const navigate = useNavigate();
+
+ // 1. Fetch Data on Load
+ useEffect(() => {
+  loadQuestions();
+ }, []);
+
+ const loadQuestions = async () => {
+  try {
+   const res = await fetchQuestions();
+   console.log("✅ Data received from API (res.data):", res.data);
+
+   // Priyanka Chnages
+   if (res.data && typeof res.data === 'object') {
+      const questionsArray = Object.values(res.data);
+      setQuestions(questionsArray);
+      console.log("✅ Questions set as array (questionsArray):", questionsArray.length);
   const navigate = useNavigate();
   
   // --- STATE ---
@@ -90,6 +108,61 @@ export default function ViewQuestionsPage() {
     }
   };
 
+  } catch (err) {
+   console.error("❌ Error fetching questions:", err);
+   setQuestions([]);
+  }
+ };
+
+ // 2. Handle Edit Click
+ const handleEdit = (id) => {
+  // Make sure this path matches your App.js route
+  navigate(`/professor/questions/edit/${id}`);//vaidehi changes
+ };
+
+ // 3. Handle Delete Click
+ const handleDelete = async (id) => {
+
+  if (window.confirm("Are you sure you want to delete this question?")) {
+   try {
+    await deleteQuestion(id);
+    setQuestions(prevQuestions => prevQuestions.filter((question) => question.question_id !== id));
+   } catch (err) {
+    alert("Failed to delete question. Check console for details.");
+    console.error(err);
+   }
+  }
+ };
+
+ const columns = [
+  { Header: 'ID', accessor: 'id' },
+  { Header: 'Question', accessor: 'question_txt' },
+  { Header: 'Option_1', accessor: 'option_1_txt' },
+  { Header: 'Option_2', accessor: 'option_2_txt' },
+  { Header: 'Option_3', accessor: 'option_3_txt' },
+  { Header: 'Option_4', accessor: 'option_4_txt' },
+  { Header: 'Solution', accessor: 'solution_text' },
+  { Header: 'Actions', accessor: 'actions' },
+ ];
+
+ const data = questions.map((question) => {
+  const solutionOption = question.options.find(opt => opt.is_correct === 1);
+  const optionTexts = question.options.map(opt => opt.option_text);
+
+  return {
+   id: question.question_id,
+   question_txt: question.question_txt,
+   option_1_txt: optionTexts[0] || '',
+   option_2_txt: optionTexts[1] || '',
+   option_3_txt: optionTexts[2] || '',
+   option_4_txt: optionTexts[3] || '',
+   solution_text: solutionOption ? solutionOption.option_text : 'N/A',
+   actions: (
+    <div className="table-actions">
+     <Link to={`/prof/questions/edit/${question.question_id}`} className="action-link">Edit</Link>
+     <button onClick={() => handleDelete(question.question_id)} className="action-button-delete">Delete</button>
+    </div>
+   ),
   const handleDelete = async (id) => {
     if (window.confirm("Delete this question?")) {
       await deleteQuestion(id);
