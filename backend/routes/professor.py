@@ -1,12 +1,20 @@
+
 from flask import Blueprint, session, redirect, url_for, flash, jsonify, request
 from ..services import quiz_service # Import the quiz logic
 from ..services.auth_service import AuthService # Import to get user data if needed
+from functools import wraps
 
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
 def professor_required(f):
+    @wraps(f)
     def wrap(*args, **kwargs):
+        # ⚠️ DIAGNOSTIC PRINTS START ⚠️
+        print(f"DEBUG: Session contents: {session.items()}")
+        print(f"DEBUG: Role found: '{session.get('role')}'")
+        # ⚠️ DIAGNOSTIC PRINTS END ⚠️
+
         if session.get('role') != 'professor':
             return jsonify({"message": "Unauthorized"}), 403 # Return JSON for React
         return f(*args, **kwargs)
@@ -47,20 +55,30 @@ def get_quizzes_api():
         return jsonify({"message": f"Error fetching quizzes: {str(e)}"}), 500
 
 # 3. API to add a new question
-@professor_bp.route('/question', methods=['POST'])
+@professor_bp.route('/add_questions', methods=['POST'])
 @professor_required
-def create_question_api():
-    # React sends JSON data:
+def add_question_api():
+    print("Received request to add question.")
     data = request.get_json() 
-    # You should validate this data before passing it to the service
-    if not all(key in data for key in ['question', 'option_a', 'answer']):
-        return jsonify({"message": "Missing required question fields"}), 400
+    print(f"Request data: {data}")
+    
+    # --- Data Validation Checks ---
+    required_keys = ['text', 'options', 'correct_index']
+    if not all(key in data for key in required_keys):
+        return jsonify({"message": f"Missing required fields"}), 400
 
     try:
-        quiz_service.insert_question(data, session.get('email'))
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        # quiz_service.insert_questions(data, session.get('email'))
+        quiz_service.insert_question(data, teacher_id)
         return jsonify({"message": "Question added successfully!"}), 201
+        
     except Exception as e:
-        return jsonify({"message": f"Database error: {str(e)}"}), 500
+        print(f"Error during question insertion: {str(e)}")
+        return jsonify({"message": "Internal server error during database operation."}), 500
 
 # 4. API to generate a quiz
 @professor_bp.route('/generate', methods=['POST'])
@@ -89,6 +107,10 @@ def get_questions_api():
             return jsonify({"message": "User ID not found in session."}), 400
 
         questions = quiz_service.fetch_questions(employee_id, fetch_scope='creator')
+        if questions is None:
+            print("WARNING: quiz_service.fetch_questions returned None. Returning empty object {}")
+            questions = {}
+            
         return jsonify(questions), 200
     except Exception as e:
         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
