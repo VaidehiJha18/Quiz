@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import Card from '../components/ui/Card'; // Make sure Card component is imported
+import Card from '../components/ui/Card'; 
 import { fetchQuestions } from '../api/apiService';
 
-// ❌ We no longer need Header or Footer on this page
-// import Header from '../components/layout/Header';
-// import Footer from '../components/layout/Footer';
 
 export default function ProfessorDashboard() {
   const [questionCount, setQuestionCount] = useState(0);
@@ -14,16 +11,21 @@ export default function ProfessorDashboard() {
     const loadQuestions = async () => {
       try {
         const res = await fetchQuestions();
-        setQuestionCount(res.data.length);
+
+        if (res.data && typeof res.data === 'object') {
+          setQuestionCount(Object.keys(res.data).length);
+        } else {
+          setQuestionCount(0);
+        }
       } catch (err) {
-        console.error(err);
+        console.error("Error loading questions on dashboard:", err);
+        setQuestionCount(0);
       }
     };
     loadQuestions();
   }, []);
 
   return (
-    // The <Header> and <Footer> have been removed from the JSX
     <main className="main-content">
       <div className="top-bar">
         <h1>Professor Dashboard</h1>
@@ -32,6 +34,7 @@ export default function ProfessorDashboard() {
       <div className="dashboard-grid">
         <Card className="card card-left-align">
           <h3>Manage Questions</h3>
+          {/*  */}
           <p>Total Questions: {questionCount}</p>
           <Link to="/professor/questions" className="btn btn-primary">
             View Questions

@@ -181,4 +181,4 @@ cython_debug/
 .cursorindexingignore
 
 # Frontend
-node_modules/
+/frontend/node_modules

@@ -7,13 +7,12 @@ import pymysql
 #         user='avnadmin',
 #         password='AVNS_IGyQyvOs9EJELlKx9h4',
 #         database='dbquiz',
-#         port=26056
+#         port=260565
 #     )
 #     print("Successfully connected to the database using PyMySQL!")
 
 # except pymysql.MySQLError as e:
 #     print(f"Failed to connect to the database: {e}")
-    
     
 
 class Config:
@@ -28,6 +27,5 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'default-dev-secret-key')
     DEBUG = True
 
-    # Session / CORS settings for cross-origin requests
-    SESSION_COOKIE_SAMESITE = "None"     # Needed for cross-origin cookies
-    SESSION_COOKIE_SECURE = False        # Set True only for HTTPS
+    SESSION_COOKIE_SECURE = False  
+    

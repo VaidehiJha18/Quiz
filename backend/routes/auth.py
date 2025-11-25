@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify, session
-from flask_cors import cross_origin
 from ..services.auth_service import AuthService
 
 # Blueprint
@@ -8,15 +7,17 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 # Service
 auth_service = AuthService()
 
+# ✅ Mac compatibility - support both localhost and 127.0.0.1
+ALLOWED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000']
+
 # ----------------- Signup -----------------
 @auth_bp.route('/signup', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
 def signup():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+        return jsonify({'status': 'OK'}), 200
 
     data = request.get_json()
-    name = data.get('name')  # match frontend
+    name = data.get('name')
     email = data.get('email')
     password = data.get('password')
 
@@ -36,11 +37,10 @@ def signup():
         return jsonify({"message": "An internal server error occurred"}), 500
 
 # ----------------- Login -----------------
-@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/login', methods=['POST'])
 def login():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
+    # if request.method == 'OPTIONS':
+    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
 
     data = request.get_json()
     email = data.get('email')
@@ -53,9 +53,14 @@ def login():
 
     if user:
         session['logged_in'] = True
-        session['user_id'] = user.id
+        master_id = getattr(user, 'master_id', None)
+
+        session['id'] = master_id if master_id else user.id
+
+        session['user_id'] = user.id     # keeping here for backward compatibility if needed
         session['username'] = user.username
-        session['role'] = getattr(user, 'role', 'student')  # default role
+        session['role'] = getattr(user, 'role', 'student')
+        
         return jsonify({
             "message": "Login successful",
             "user": {
@@ -68,31 +73,29 @@ def login():
         return jsonify({"message": "Invalid credentials"}), 401
 
 # ----------------- Logout -----------------
-@auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/logout', methods=['POST'])
 def logout():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
-
+    
     session.clear()
     return jsonify({"message": "Logout successful"}), 200
 
 # ----------------- Get Profile -----------------
-@auth_bp.route('/profile', methods=['GET', 'OPTIONS'])
-@cross_origin(origin='http://localhost:3000', supports_credentials=True)
+@auth_bp.route('/profile', methods=['GET'])
 def get_profile():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200  # Handle preflight
-
+    
     if session.get('logged_in'):
         user_id = session.get('user_id')
+        if not user_id:
+             return jsonify({"message": "User ID not found in session."}), 401
+        
         user_details = auth_service.get_user_by_id(user_id)
-        return jsonify({
-            "user_id": user_details.id,
-            "username": user_details.username,
-            "email": user_details.email,
-            "role": getattr(user_details, 'role', 'student'),
-            "message": "User profile data retrieved."
-        }), 200
+        if user_details:
+             return jsonify({
+                "user_id": user_details.id,
+                "username": user_details.username,
+                "email": user_details.email,
+                "role": getattr(user_details, 'role', 'student'),
+                "message": "User profile data retrieved."
+            }), 200
     else:
         return jsonify({"message": "Unauthorized"}), 401
