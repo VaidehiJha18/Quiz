@@ -157,6 +157,145 @@ def fetch_questions(employee_id, fetch_scope='creator'):
     print(questions_with_options)
 
     return questions_with_options
+# Vaidehi Changes
+# def get_question_by_id(question_id):
+#     """
+#     Placeholder: This is where your database query to fetch 
+#     a single question by ID will go. 
+#     """
+#     # **CRITICAL:** Return a dictionary with the data structure 
+#     # the frontend expects (e.g., 'Question', 'Option1', etc.)
+#     return None # Return None if not found, or the data dictionary
+def get_question_by_id(question_id):
+    """Fetches a single question and its options from the database by ID."""
+    conn = get_db_connection()
+    # Use DictCursor to get results as dictionaries
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    
+    try:
+        # SQL to join the question with all its options and correct flag
+        sql = """
+            SELECT 
+                qb.id AS question_id,
+                qb.question_txt, 
+                am.option_text,
+                am.is_correct
+            FROM question_bank qb
+            JOIN answer_map am ON qb.id = am.question_id
+            WHERE qb.id = %s
+        """
+        cursor.execute(sql, (question_id,))
+        results = cursor.fetchall()
+
+        if not results:
+            return None # Question not found
+
+        # Initialize the final question structure
+        question_data = {
+            # Use 'question_txt' from DB and map to 'text' for the frontend state
+            'text': results[0]['question_txt'], 
+            'options': [],
+            'correct': '' # Will hold the index (0, 1, 2, 3) as a string
+        }
+        
+        # Collect options and find the correct one
+        option_texts = []
+        correct_text = None
+
+        for row in results:
+            option_texts.append(row['option_text'])
+            if row['is_correct'] == 1:
+                correct_text = row['option_text']
+
+        # Ensure we have 4 options slots for the frontend form
+        while len(option_texts) < 4:
+            option_texts.append("")
+        
+        question_data['options'] = option_texts
+        
+        # Find the index of the correct text and store it as a string
+        if correct_text in option_texts:
+            correct_index = option_texts.index(correct_text)
+            question_data['correct'] = str(correct_index)
+        else:
+             question_data['correct'] = '' # Failsafe
+        
+        return question_data
+
+    except Exception as e:
+        print(f"Database error in get_question_by_id: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()    
+
+# def update_question(question_id, data):
+#     """
+#     Placeholder: This is where your database update logic will go.
+#     """
+#     # Return True or the updated object upon successful update
+#     return None 
+def update_question(question_id, data):
+    """Updates the question text and re-saves all options/answers in a transaction."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Update the question text in question_bank
+    sql_update_question = """
+        UPDATE question_bank SET question_txt = %s WHERE id = %s
+    """
+    
+    # 2. Delete existing answers/options from answer_map
+    sql_delete_options = """
+        DELETE FROM answer_map WHERE question_id = %s
+    """
+    
+    # 3. Insert the new/updated options into answer_map
+    sql_insert_options = """
+        INSERT INTO answer_map (question_id, option_text, is_correct)
+        VALUES (%s, %s, %s)
+    """
+
+    try:
+        # Start Transaction
+        conn.begin()
+        
+        # --- Update Question Bank ---
+        cursor.execute(sql_update_question, (data['text'], question_id))
+
+        # --- Delete Old Options ---
+        cursor.execute(sql_delete_options, (question_id,))
+
+        # --- Insert New Options ---
+        correct_index = int(data['correct_index'])
+        
+        # Note: We use data['options'] which includes the empty strings for up to 4 options
+        for index, option_text in enumerate(data['options']):
+            # Skip inserting empty options if they were not provided
+            if not option_text.strip():
+                continue
+                
+            is_correct_flag = 1 if index == correct_index else 0
+            
+            cursor.execute(sql_insert_options, (
+                question_id,
+                option_text,
+                is_correct_flag,
+            ))
+            
+        # Commit all changes if successful
+        conn.commit()
+        return True
+        
+    except Exception as e:
+        conn.rollback() # Revert all changes if any step failed
+        print(f"Database error during question update: {e}")
+        return False
+
+    finally:
+        cursor.close()
+        conn.close()
+# Vaidehi Changes
         
 # 3. Generate and Save Quiz
 def generate_and_save_quiz(teacher_id):
@@ -166,7 +305,8 @@ def generate_and_save_quiz(teacher_id):
     # teacher_id = None
     quiz_id = None
 
-   
+
+  
     try:    
         cursor.execute("SELECT id FROM question_bank")
         all_questions = cursor.fetchall()
@@ -246,3 +386,51 @@ def generate_and_save_quiz(teacher_id):
 
 #         🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
 #         Testing generate_and_save_quiz
+
+
+#Vaidehi testing  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# def get_question_by_id(question_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor(pymysql.cursors.DictCursor)
+    
+#     # 🚨 DEBUG STEP 1: Check if the function is entered
+#     print(f"\nDEBUG: Attempting to fetch question ID: {question_id}") 
+    
+#     try:
+#         # SQL query to join question_bank and answer_map
+#         sql = """
+#             SELECT 
+#                 qb.id AS question_id,
+#                 qb.question_txt,
+#                 am.option_text,
+#                 am.is_correct
+#             FROM question_bank qb
+#             JOIN answer_map am ON qb.id = am.question_id
+#             WHERE qb.id = %s
+#         """
+        
+#         # 🚨 DEBUG STEP 2: Execute the query
+#         cursor.execute(sql, (question_id,))
+#         results = cursor.fetchall()
+        
+#         # 🚨 DEBUG STEP 3: Check query results
+#         print(f"DEBUG: MySQL Results count: {len(results) if results else 0}")
+#         # print(f"DEBUG: First result row: {results[0] if results else 'N/A'}") # Use this carefully
+        
+#         if not results:
+#             print("DEBUG: Question not found in database.")
+#             return None
+        
+#         # ... (rest of the data mapping logic) ...
+        
+#         # 🚨 DEBUG STEP 4: Check final returned structure
+#         print(f"DEBUG: Successfully structured question data for ID {question_id}.")
+#         return question_data
+
+#     except Exception as e:
+#         print(f"!!! DATABASE ERROR in get_question_by_id: {e}")
+#         return None
+#     finally:
+#         cursor.close()
+#         conn.close()

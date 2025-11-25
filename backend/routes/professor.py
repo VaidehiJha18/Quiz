@@ -3,6 +3,7 @@ from flask import Blueprint, session, redirect, url_for, flash, jsonify, request
 from ..services import quiz_service # Import the quiz logic
 from ..services.auth_service import AuthService # Import to get user data if needed
 from functools import wraps
+# from ..services.quiz_service import get_question_by_id, update_question
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
@@ -114,6 +115,83 @@ def get_questions_api():
     except Exception as e:
         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
     
+# Vaidehi Changes
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@VAI@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @professor_bp.route('/questions/<int:id>', methods=['GET'])
+# def get_single_question(id):
+#     try:
+#         # Calls the service function to get data
+#         question_data = get_question_by_id(id) 
+        
+#         if not question_data:
+#             return jsonify({'message': 'Question not found'}), 404
+
+#         return jsonify(question_data)
+        
+#     except Exception as e:
+#         print(f"Error fetching question ID {id}: {e}") 
+#         return jsonify({'message': 'Internal Server Error'}), 500
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# 6. API to fetch/update a single question
+@professor_bp.route('/questions/<int:id>', methods=['GET', 'PUT'])
+@professor_required
+def handle_single_question(id):
+    """Handles fetching (GET) and updating (PUT) a single question."""
+    
+    if request.method == 'GET':
+        # --- Logic for Fetching (GET) ---
+        try:
+           
+            question_data = quiz_service.get_question_by_id(id) 
+            
+            if not question_data:
+                return jsonify({'message': 'Question not found'}), 404
+                
+            return jsonify(question_data), 200 
+
+        except Exception as e:
+           
+            print(f"!!! ERROR during GET for ID {id}: {e}") 
+            return jsonify({'message': 'Internal Server Error during fetch.'}), 500
+
+    elif request.method == 'PUT':
+        # --- Logic for Updating (PUT) ---
+        try:
+            data = request.get_json()
+            
+            updated_q = quiz_service.update_question(id, data) 
+            
+            if not updated_q:
+                return jsonify({'message': 'Question not found or update failed'}), 404
+                
+            return jsonify({'message': 'Question updated successfully', 'question': updated_q}), 200 # <-- CRITICAL: Return response status
+
+        except Exception as e:
+           
+            print(f"!!! ERROR during PUT for ID {id}: {e}")
+            return jsonify({'message': 'Internal Server Error during update.'}), 500
+
+    
+    return jsonify({'message': 'Method not allowed'}), 405
+#@@@@@@@@@@@@@@@@@@@VAI@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @professor_bp.route('/questions/<int:id>', methods=['PUT'])
+# def handle_update_question(id):
+#     try:
+#         data = request.get_json()
+        
+#         # Calls the service function to update data
+#         updated_q = update_question(id, data)
+        
+#         if not updated_q:
+#              return jsonify({'message': 'Question not found'}), 404
+             
+#         return jsonify({'message': 'Question updated successfully', 'question': updated_q})
+
+#     except Exception as e:
+#         print(f"Error updating question ID {id}: {e}")
+#         return jsonify({'message': 'Internal Server Error'}), 500
+# @@@@@@@@@@@@@@@@@@@VAI@@@@@@@@@@@@@@@@@@@@@@@@@@@ 
 # @professor_bp.route('/questions', methods=['GET'])
 # def get_question_bank():
 #     try:

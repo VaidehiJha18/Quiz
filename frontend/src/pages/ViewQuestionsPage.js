@@ -18,7 +18,7 @@ export default function ViewQuestionsPage() {
    const res = await fetchQuestions();
    console.log("✅ Data received from API (res.data):", res.data);
 
-   // 🛑 CRITICAL FIX: Convert the backend object to an array 🛑
+   // Priyanka Chnages
    if (res.data && typeof res.data === 'object') {
       const questionsArray = Object.values(res.data);
       setQuestions(questionsArray);
@@ -36,7 +36,7 @@ export default function ViewQuestionsPage() {
  // 2. Handle Edit Click
  const handleEdit = (id) => {
   // Make sure this path matches your App.js route
-  navigate(`/professor/questions/edit/${id}`);
+  navigate(`/professor/questions/edit/${id}`);//vaidehi changes
  };
 
  // 3. Handle Delete Click
@@ -78,7 +78,7 @@ export default function ViewQuestionsPage() {
    solution_text: solutionOption ? solutionOption.option_text : 'N/A',
    actions: (
     <div className="table-actions">
-     <Link to={`/professor/questions/edit/${question.question_id}`} className="action-link">Edit</Link>
+     <Link to={`/prof/questions/edit/${question.question_id}`} className="action-link">Edit</Link>
      <button onClick={() => handleDelete(question.question_id)} className="action-button-delete">Delete</button>
     </div>
    ),
