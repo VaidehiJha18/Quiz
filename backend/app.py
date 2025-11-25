@@ -16,7 +16,7 @@ def create_app(config_class=Config):
     print(f"DB_PORT: {app.config.get('DB_PORT')}")
     print("=" * 50)
     app.config.update(
-        SESSION_COOKIE_SECURE = True
+        SESSION_COOKIE_SECURE = True,
         SESSION_COOKIE_SAMESITE = 'Lax'
         # SECRET_KEY=app.config.get('SECRET_KEY')
     )
