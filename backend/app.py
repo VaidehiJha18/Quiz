@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_cors import CORS  
 from .config import Config
 import os
@@ -17,7 +17,7 @@ def create_app(config_class=Config):
     print("=" * 50)
     app.config.update(
         SESSION_COOKIE_SECURE = True,
-        SESSION_COOKIE_SAMESITE = 'Lax',
+        SESSION_COOKIE_SAMESITE = 'None',
         SESSION_COOKIE_DOMAIN = os.environ.get('BACKEND_HOST', None)
         # SECRET_KEY=app.config.get('SECRET_KEY')
     )

@@ -33,5 +33,5 @@ class Config:
     # Flask
     SECRET_KEY = os.environ.get('SECRET_KEY', 'default-dev-secret-key')
     DEBUG = True
-    SESSION_COOKIE_SECURE = False  
+    SESSION_COOKIE_SECURE = True  
     
