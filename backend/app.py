@@ -3,8 +3,17 @@ from flask_cors import CORS
 from .config import Config
 import os
 
+FRONTEND_BUILD_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'build'
+)
+
 def create_app(config_class=Config):
-    app = Flask(__name__)
+    app = Flask(
+        __name__, 
+        static_url_path='', 
+        static_folder=FRONTEND_BUILD_DIR,
+        template_folder=FRONTEND_BUILD_DIR
+    )
 
     app.config.from_object(config_class)  
     # DEBUG: Print what's in the config
@@ -22,10 +31,11 @@ def create_app(config_class=Config):
         # SECRET_KEY=app.config.get('SECRET_KEY')
     )
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+    LIVE_RENDER_URL = 'https://quiz-frontend-bg5u.onrender.com'
 
     # Enable CORS for all routes
     CORS(app, 
-         resources={r"/*": {"origins": [FRONTEND_URL]}}, 
+         resources={r"/*": {"origins": [FRONTEND_URL, LIVE_RENDER_URL]}}, 
          supports_credentials=True)
     # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     
@@ -37,4 +47,13 @@ def create_app(config_class=Config):
     app.register_blueprint(professor_bp, url_prefix='/prof')
     app.register_blueprint(student_bp, url_prefix='/student')
     
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve(path):
+        # Optimization: skip the file serving if it's an API route
+        if path.startswith('auth/') or path.startswith('prof/') or path.startswith('student/'):
+            pass 
+        
+        return send_from_directory(app.template_folder, 'index.html')
+
     return app
