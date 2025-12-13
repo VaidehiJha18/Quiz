@@ -27,17 +27,22 @@ def create_app(config_class=Config):
     app.config.update(
         SESSION_COOKIE_SECURE = True,
         SESSION_COOKIE_SAMESITE = 'None',
-        SESSION_COOKIE_DOMAIN = os.environ.get('BACKEND_HOST', None)
-        # SECRET_KEY=app.config.get('SECRET_KEY')
+        SESSION_COOKIE_HTTPONLY = True,
     )
-    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-    LIVE_RENDER_URL = 'https://quiz-frontend-bg5u.onrender.com'
-
-    # Enable CORS for all routes
+    
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')
+    ALLOWED_ORIGINS = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5000',
+        'https://quiz-frontend-bg5u.onrender.com',
+        FRONTEND_URL,
+    ]
+    
     CORS(app, 
-         resources={r"/*": {"origins": [FRONTEND_URL, LIVE_RENDER_URL]}}, 
+         origins=ALLOWED_ORIGINS, 
          supports_credentials=True)
-    # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     
     # Register Blueprints
     from .routes.auth import auth_bp

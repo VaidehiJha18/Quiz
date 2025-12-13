@@ -169,16 +169,26 @@ def generate_and_save_quiz(teacher_id):
 
    
     try:    
-        cursor.execute("SELECT id FROM question_bank")
+        # ✅ Filter questions by the logged-in teacher
+        cursor.execute("""
+            SELECT qb.id 
+            FROM question_bank qb
+            JOIN question_employee qe ON qb.id = qe.question_id
+            WHERE qe.employee_id = %s
+        """, (teacher_id,))
         all_questions = cursor.fetchall()
 
         all_ids = [q['id'] for q in all_questions]
         SAMPLE_SIZE = 5
         
+        print(f"DEBUG: Total questions available for teacher {teacher_id}: {len(all_ids)}")
+        
         if not all_ids:
+            print("WARNING: No questions found in question_bank!")
             return None 
 
         selected_ids = random.sample(all_ids, min(SAMPLE_SIZE, len(all_ids)))
+        print(f"DEBUG: Selected question IDs: {selected_ids}")
 
         unique_link_id = str(uuid.uuid4())
         quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -209,6 +219,8 @@ def generate_and_save_quiz(teacher_id):
             SCHEDULED_END
         ))
         quiz_id = cursor.lastrowid
+        print(f"DEBUG: Created quiz with ID: {quiz_id}, Title: {quiz_title}")
+        print(f"DEBUG: Quiz settings - Status: {QUIZ_STATUS}, Questions: {TOTAL_QUESTIONS}, Marks: {TOTAL_MARKS}, Time: {TIME_LIMIT} min")
         conn.commit()
         
         sql_link_questions = "INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)"
@@ -217,8 +229,16 @@ def generate_and_save_quiz(teacher_id):
 
         cursor.executemany(sql_link_questions, question_links)
         conn.commit()
+        print(f"DEBUG: Successfully linked {len(question_links)} questions to quiz {quiz_id}")
         
-        return quiz_id 
+        # Fetch and return the complete quiz details
+        cursor.execute("""
+            SELECT * FROM generated_quizzes 
+            WHERE id = %s
+        """, (quiz_id,))
+        quiz_details = cursor.fetchone()
+        
+        return quiz_details 
         
     finally:
         cursor.close()
