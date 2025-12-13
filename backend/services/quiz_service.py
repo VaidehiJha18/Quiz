@@ -158,14 +158,7 @@ def fetch_questions(employee_id, fetch_scope='creator'):
 
     return questions_with_options
 # Vaidehi Changes
-# def get_question_by_id(question_id):
-#     """
-#     Placeholder: This is where your database query to fetch 
-#     a single question by ID will go. 
-#     """
-#     # **CRITICAL:** Return a dictionary with the data structure 
-#     # the frontend expects (e.g., 'Question', 'Option1', etc.)
-#     return None # Return None if not found, or the data dictionary
+
 def get_question_by_id(question_id):
     """Fetches a single question and its options from the database by ID."""
     conn = get_db_connection()
@@ -229,12 +222,7 @@ def get_question_by_id(question_id):
         cursor.close()
         conn.close()    
 
-# def update_question(question_id, data):
-#     """
-#     Placeholder: This is where your database update logic will go.
-#     """
-#     # Return True or the updated object upon successful update
-#     return None 
+
 def update_question(question_id, data):
     """Updates the question text and re-saves all options/answers in a transaction."""
     conn = get_db_connection()
@@ -295,6 +283,97 @@ def update_question(question_id, data):
     finally:
         cursor.close()
         conn.close()
+def fetch_questions_by_course(course_id):
+    """Fetches full question details for a specific course ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # JOIN linking question text to their options and correct status
+        sql = """
+            SELECT 
+                qb.id AS question_id,
+                qb.question_txt,
+                am.option_text,
+                am.is_correct
+            FROM question_bank qb
+            JOIN answer_map am ON qb.id = am.question_id
+            JOIN question_course qc ON qb.id = qc.question_id
+            WHERE qc.course_id = %s
+        """
+        cursor.execute(sql, (course_id,))
+        results = cursor.fetchall()
+
+        # Restructure results into nested format for React
+        questions = {}
+        for row in results:
+            q_id = row['question_id']
+            if q_id not in questions:
+                questions[q_id] = {
+                    'id': q_id,
+                    'text': row['question_txt'],
+                    'options': []
+                }
+            questions[q_id]['options'].append({
+                'option_text': row['option_text'],
+                'is_correct': row['is_correct']
+            })
+        return list(questions.values())
+    except Exception as e:
+        print(f"Database crash during question fetch: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+# def fetch_questions_by_course(course_id):
+#     """Fetches all questions and their options linked to a specific course ID."""
+#     conn = get_db_connection()
+#     # Use DictCursor to get results as dictionaries
+#     cursor = conn.cursor(pymysql.cursors.DictCursor) 
+    
+#     try:
+#         # SQL query to join Question, Answer, and Course tables
+#         sql = """
+#             SELECT 
+#                 qb.id AS question_id,
+#                 qb.question_txt,
+#                 am.option_text,
+#                 am.is_correct
+#             FROM question_bank qb
+#             JOIN question_course qc ON qb.id = qc.question_id
+#             JOIN answer_map am ON qb.id = am.question_id
+#             WHERE qc.course_id = %s
+#             ORDER BY qb.id, am.id
+#         """
+#         cursor.execute(sql, (course_id,))
+#         results = cursor.fetchall()
+        
+#     except Exception as e:
+#         print(f"Database error fetching questions for course {course_id}: {e}")
+#         return []
+#     finally:
+#         cursor.close()
+#         conn.close()
+
+#     # --- Data Restructuring ---
+#     questions_map = {}
+    
+#     for row in results:
+#         q_id = row['question_id']
+        
+#         if q_id not in questions_map:
+#             questions_map[q_id] = {
+#                 'id': q_id,
+#                 'question_txt': row['question_txt'],
+#                 'options': []
+#             }
+        
+#         questions_map[q_id]['options'].append({
+#             'option_text': row['option_text'],
+#             'is_correct': row['is_correct']
+#         })
+        
+#     # Return the dictionary values (which is an array of question objects)
+#     return list(questions_map.values())
 # Vaidehi Changes
         
 # 3. Generate and Save Quiz
@@ -362,8 +441,53 @@ def generate_and_save_quiz(teacher_id):
     finally:
         cursor.close()
         conn.close()
+def delete_question(question_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Delete related data first due to foreign key constraints
+        cursor.execute("DELETE FROM answer_map WHERE question_id = %s", (question_id,))
+        cursor.execute("DELETE FROM question_course WHERE question_id = %s", (question_id,))
+        # Delete the question itself
+        delete_count = cursor.execute("DELETE FROM question_bank WHERE id = %s", (question_id,))
+        
+        conn.commit()
+        return delete_count > 0
 
+    except Exception as e:
+        conn.rollback()
+        print(f"Transaction failed for question deletion (ID {question_id}): {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+# def delete_question(question_id):
+#     """Deletes a question and all related options and links in a transaction."""
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     try:
+#         # 1. Delete options from answer_map (due to foreign key constraints, this is necessary)
+#         cursor.execute("DELETE FROM answer_map WHERE question_id = %s", (question_id,))
+        
+#         # 2. Delete links from question_course
+#         cursor.execute("DELETE FROM question_course WHERE question_id = %s", (question_id,))
+        
+#         # 3. Delete the question itself
+#         delete_count = cursor.execute("DELETE FROM question_bank WHERE id = %s", (question_id,))
+        
+#         # Commit the transaction if all deletions succeeded
+#         conn.commit()
+        
+#         # Return True only if the question itself was deleted
+#         return delete_count > 0
 
+#     except Exception as e:
+#         conn.rollback()
+#         print(f"Transaction failed for question deletion (ID {question_id}): {e}")
+#         return False
+#     finally:
+#         cursor.close()
+#         conn.close()
 # ==============================================================================================
 # if __name__ == "__main__":
 #     app = create_app()
@@ -388,49 +512,3 @@ def generate_and_save_quiz(teacher_id):
 #         Testing generate_and_save_quiz
 
 
-#Vaidehi testing  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-# def get_question_by_id(question_id):
-#     conn = get_db_connection()
-#     cursor = conn.cursor(pymysql.cursors.DictCursor)
-    
-#     # 🚨 DEBUG STEP 1: Check if the function is entered
-#     print(f"\nDEBUG: Attempting to fetch question ID: {question_id}") 
-    
-#     try:
-#         # SQL query to join question_bank and answer_map
-#         sql = """
-#             SELECT 
-#                 qb.id AS question_id,
-#                 qb.question_txt,
-#                 am.option_text,
-#                 am.is_correct
-#             FROM question_bank qb
-#             JOIN answer_map am ON qb.id = am.question_id
-#             WHERE qb.id = %s
-#         """
-        
-#         # 🚨 DEBUG STEP 2: Execute the query
-#         cursor.execute(sql, (question_id,))
-#         results = cursor.fetchall()
-        
-#         # 🚨 DEBUG STEP 3: Check query results
-#         print(f"DEBUG: MySQL Results count: {len(results) if results else 0}")
-#         # print(f"DEBUG: First result row: {results[0] if results else 'N/A'}") # Use this carefully
-        
-#         if not results:
-#             print("DEBUG: Question not found in database.")
-#             return None
-        
-#         # ... (rest of the data mapping logic) ...
-        
-#         # 🚨 DEBUG STEP 4: Check final returned structure
-#         print(f"DEBUG: Successfully structured question data for ID {question_id}.")
-#         return question_data
-
-#     except Exception as e:
-#         print(f"!!! DATABASE ERROR in get_question_by_id: {e}")
-#         return None
-#     finally:
-#         cursor.close()
-#         conn.close()

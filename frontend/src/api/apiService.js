@@ -1,14 +1,15 @@
 
 import axios from 'axios';
 
-// const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
- const API_BASE_URL = '/'; 
-const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
+const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
+//  const API_BASE_URL = '/'; 
+// const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
 // Generic API service
 export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
 });
+// import { api } from './index';
 
 
 // Auth endpoints
@@ -30,10 +31,10 @@ export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);//Vaid
 
 // --- Dropdown API Calls (Add these to the bottom of apiService.js) ---
 
-// 1. Get Schools
+// 1. Get schools
 export const fetchSchools = () => api.get('/prof/schools');
 
-// 2. Get Programs (linked to School)
+// 2. Get Programs (linked to schools)
 export const fetchPrograms = (schoolId) => api.get(`/prof/programs?school_id=${schoolId}`);
 
 // 3. Get Departments (linked to Program)
