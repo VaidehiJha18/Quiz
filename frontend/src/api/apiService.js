@@ -2,7 +2,10 @@
 import axios from 'axios';
 
 // const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
- const API_BASE_URL = '/'; 
+// const API_BASE_URL = '/'; 
+// future-proof line for both environments:
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/';
+
 const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
 // Generic API service
 export const api = axios.create({
@@ -23,7 +26,7 @@ export const submitQuiz = (id, data) => api.post(`/quizzes/${id}/submit`, data);
 // Professor endpoints
 export const fetchQuestions = () => api.get('/prof/questions');
 export const addQuestion = (data) => api.post('/prof/add_questions', data);
-export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
+export const updateQuestion = (id, data) => api.put(`/prof/update_question/${id}`, data);
 export const deleteQuestion = (id) => api.delete(`/prof/questions/${id}`);
 export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);//Vaidehi Changes
 
