@@ -39,9 +39,6 @@ def signup():
 # ----------------- Login -----------------
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    # if request.method == 'OPTIONS':
-    #     return jsonify({'status': 'OK'}), 200  # Handle preflight
-
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -52,19 +49,20 @@ def login():
     user = auth_service.authenticate_user(email, password)
 
     if user:
-        session['logged_in'] = True
         master_id = getattr(user, 'master_id', None)
-
+        
+        session['logged_in'] = True
+        
+        # 1. Essential ID for Filtering/Ownership (The Master ID)
         session['id'] = master_id if master_id else user.id
 
-        session['user_id'] = user.master_id     # keeping here for backward compatibility if needed
-        session['username'] = user.username
+        # 2. Essential for Authorization/Routing (The Role)
         session['role'] = getattr(user, 'role', 'student')
-        
+                
         return jsonify({
             "message": "Login successful",
             "user": {
-                "id": user.master_id,
+                "id": master_id,
                 "name": user.username,
                 "role": session['role']
             }
@@ -84,14 +82,16 @@ def logout():
 def get_profile():
     
     if session.get('logged_in'):
-        user_id = session.get('user_id')
+        # 🟢 FIX: Use the primary session ID ('id') for the lookup.
+        user_id = session.get('id')
         if not user_id:
              return jsonify({"message": "User ID not found in session."}), 401
         
+        # This function must be able to look up the user using the master_id
         user_details = auth_service.get_user_by_id(user_id)
         if user_details:
-             return jsonify({
-                "user_id": user_details.id,
+            return jsonify({
+                "user_id": user_details.master_id, 
                 "username": user_details.username,
                 "email": user_details.email,
                 "role": getattr(user_details, 'role', 'student'),

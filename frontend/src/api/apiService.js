@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // const API_BASE_URL = 'http://localhost:5000/'; // Flask backend URL
-// const API_BASE_URL = '/'; 
+
 // future-proof line for both environments:
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/';
 
