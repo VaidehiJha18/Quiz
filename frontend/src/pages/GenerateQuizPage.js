@@ -377,7 +377,7 @@ export default function GenerateQuizPage() {
                  <label style={styles.label}>Select Department:</label>
                  <select style={styles.select} value={selections.department} onChange={handleDeptChange} disabled={!selections.program}>
                     <option value="">Select a department</option>
-                    {lists.departments.map(item => <option key={item.id} value={item.id}>{item.dept_name}</option>)}
+                    {lists.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
             </div>
 

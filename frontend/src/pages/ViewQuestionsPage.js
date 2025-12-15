@@ -1,48 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { 
-//   fetchSchool, fetchPrograms, fetchDepartments, fetchCourses, 
-//   fetchQuestionsByCourse, deleteQuestion 
-// } from '../api/apiService'; 
+import { 
+  fetchSchools, fetchPrograms, fetchDepartments, fetchCourses, 
+  fetchQuestionsByCourse, deleteQuestion 
+} from '../api/apiService'; 
 import Button from '../components/forms/Button'; 
 import { Link } from 'react-router-dom';
-import { 
-  fetchSchools, 
-  fetchPrograms, 
-  fetchDepartments, 
-  fetchCourses, 
-  fetchQuestionsByCourse, // Kept for fetching by course
-  deleteQuestion,       // Kept for deleting questions
-  // If you use fetchQuestions (to load all questions initially), include it here too:
-  // fetchQuestions,
-} from '../api/apiService'; //vaidehi
 
-// const handleCourseChange = async (e) => {
-//     const courseId = e.target.value;
-//     setSelections({ ...selections, course: courseId });
-    
-//     if (courseId) {
-//         setLoading(true);
-//         try {
-//             // 🚀 Call the new API function
-//             const res = await fetchQuestionsByCourse(courseId);
-            
-//             // Check if data is an array or an object (to be robust)
-//             const data = Array.isArray(res.data) ? res.data : Object.values(res.data || {});
-            
-//             // 🚀 Update the questions state
-//             setQuestions(data); 
-//         } catch (err) { 
-//             console.error("Error fetching questions by course:", err); 
-//             setQuestions([]);
-//         }
-//         finally { 
-//             setLoading(false); 
-//         }
-//     } else {
-//         setQuestions([]); // Clear questions if course is deselected
-//     }
-// };//vaidehi
 export default function ViewQuestionsPage() {
   const navigate = useNavigate();
   
@@ -52,7 +16,7 @@ export default function ViewQuestionsPage() {
   });
 
   const [lists, setLists] = useState({
-    School: [], programs: [], departments: [], semesters: [1, 2, 3, 4, 5, 6, 7, 8], courses: []
+    schools: [], programs: [], departments: [], semesters: [1, 2, 3, 4, 5, 6, 7, 8], courses: []
   });
 
   const [questions, setQuestions] = useState([]);
@@ -66,7 +30,7 @@ export default function ViewQuestionsPage() {
   const loadSchools = async () => {
     try {
       const res = await fetchSchools();
-      setLists(prev => ({ ...prev, School: res.data || [] }));
+      setLists(prev => ({ ...prev, schools: res.data || [] }));
     } catch (err) { console.error(err); }
   };
 
@@ -108,38 +72,23 @@ export default function ViewQuestionsPage() {
     }
   };
 
-const handleCourseChange = async (e) => {
-  const courseId = e.target.value;
-  setSelections({ ...selections, course: courseId });
-  
-  if (courseId) {
-    setLoading(true);
-    try {
-      const res = await fetchQuestionsByCourse(courseId);
-      
-      console.log("API Response Status:", res.status);
-      console.log("API Response Data:", res.data);
-      
-      let data = res.data; 
-      
-      // If the data is an object (dictionary with ID keys), convert it to an array of values
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-          data = Object.values(data);
-      }
-      
-      setQuestions(data || []);
-
-    } catch (err) { 
-      console.error("Error fetching questions by course:", err); 
+  const handleCourseChange = async (e) => {
+    const courseId = e.target.value;
+    setSelections({ ...selections, course: courseId });
+    
+    if (courseId) {
+      setLoading(true);
+      try {
+        const res = await fetchQuestionsByCourse(courseId);
+        // Handle both array and dict formats
+        const data = Array.isArray(res.data) ? res.data : (res.data.questions || []);
+        setQuestions(data);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    } else {
       setQuestions([]);
     }
-    finally { 
-      setLoading(false); 
-    }
-  } else {
-    setQuestions([]);
-  }
-};
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm("Delete this question?")) {
@@ -162,7 +111,7 @@ const handleCourseChange = async (e) => {
 
       {/* --- FILTER CARD (UPDATED LAYOUT) --- */}
       <div style={styles.filterCard}>
-        <h3 style={{marginBottom: '20px', color: '#444'}}>"Filter Options"</h3>
+        <h3 style={{marginBottom: '20px', color: '#444'}}></h3>
         
         {/* ✅ GRID LAYOUT START */}
         <div style={styles.gridContainer}>
@@ -172,35 +121,17 @@ const handleCourseChange = async (e) => {
                 <label style={styles.label}>Select School:</label>
                 <select style={styles.select} value={selections.school} onChange={handleSchoolChange}>
                     <option value="">Select a school</option>
-                    {lists.School.map(item => <option key={item.id} value={item.id}>{item.school_name}</option>)}
+                    {lists.schools.map(item => <option key={item.id} value={item.id}>{item.school_name}</option>)}
                 </select>
             </div>
 
-            {/* <div style={styles.inputGroup}>
+            <div style={styles.inputGroup}>
                  <label style={styles.label}>Select Department:</label>
                  <select style={styles.select} value={selections.department} onChange={handleDeptChange} disabled={!selections.program}>
                     <option value="">Select a department</option>
                     {lists.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-            </div> */}
-
-            <div style={styles.inputGroup}>
-                 <label style={styles.label}>Select Department:</label>
-                 <select 
-                    style={styles.select} 
-                    value={selections.department} 
-                    onChange={handleDeptChange} 
-                    disabled={!selections.program}
-                 >
-                    <option value="">Select a department</option>
-                    {lists.departments.map(item => 
-                        <option key={item.id} value={item.id}>
-                            {item.dept_name}  
-                        </option>
-                    )}
-                </select>
-            </div> 
-            {/* vaidehi changes */}
+            </div>
 
             {/* Row 2: Program & Semester */}
             <div style={styles.inputGroup}>
@@ -252,8 +183,8 @@ const handleCourseChange = async (e) => {
             {questions.length > 0 ? (
               questions.map((q) => (
                 <tr key={q.id} style={styles.tableRow}>
-                  <td style={styles.td}>{q.question_id}</td>
-                  <td style={styles.td}>{q.question_txt}</td>
+                  <td style={styles.td}>{q.id}</td>
+                  <td style={styles.td}>{q.text}</td>
                   <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
                   <td style={styles.td}>{q.options?.[1]?.option_text || '-'}</td>
                   <td style={styles.td}>{q.options?.[2]?.option_text || '-'}</td>
@@ -298,7 +229,7 @@ const styles = {
     alignItems: 'center', 
     marginBottom: '25px' 
   },
-
+  
   // FILTER CARD STYLES
   filterCard: {
     backgroundColor: '#fff',
