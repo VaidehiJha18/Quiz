@@ -24,33 +24,6 @@ def professor_required(f):
     return wrap
 
 # --- API Endpoints for React ---
-# 1. API to check session and get user data
-@professor_bp.route('/programs', methods=['GET'])
-@professor_required
-def get_programs_api_view(id=None): # Renamed to 'get_programs_api_view' to be safe
-    school_id_raw = request.args.get('school_id')
-    if not school_id_raw:
-        return jsonify([]), 200
-    
-    conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-    
-    try:
-        school_id_int = int(school_id_raw)
-        
-        # Ensure 'program' table name is correct based on your workbench image
-        sql = "SELECT id, program_name FROM program WHERE school_id = %s"
-        cursor.execute(sql, (school_id_int,))
-        
-        data = cursor.fetchall()
-        return jsonify(data), 200
-    except Exception as e:
-        print(f"Error fetching programs: {e}")
-        return jsonify({"message": "Database error"}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
 # 2. API to view all quizzes 
 @professor_bp.route('/quizzes', methods=['GET'])
 @professor_required
@@ -91,22 +64,46 @@ def add_question_api():
         print(f"Error during question insertion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
 
-# 4. API to generate a quiz
+# 4. API to generate a quiz ❤️❤️❤️❤️❤️❤️❤️
 @professor_bp.route('/generate', methods=['POST'])
 @professor_required
 def generate_quiz_api():
     try:
         teacher_id = session.get('id')
+        data = request.get_json()
+        course_id = data.get('course_id') # Get course from frontend selection
+
         if not teacher_id:
-            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+            return jsonify({"message": "User ID not found"}), 400
         
-        quiz_id = quiz_service.generate_and_save_quiz(teacher_id)
+        # Pass both teacher and course to the service
+        quiz_data = quiz_service.generate_and_save_quiz(teacher_id, course_id)
+
+        if not quiz_data:
+            return jsonify({"message": "No questions found for this course."}), 404
+        
         return jsonify({
-            "message": "Quiz generated and saved for review.",
-            "quiz_id": quiz_id
+            "message": "Quiz generated and saved successfully.",
+            "quiz_link": quiz_data['quiz_link'],
+            "quiz_id": quiz_data['id']
         }), 201
     except Exception as e:
         return jsonify({"message": f"Quiz generation failed: {str(e)}"}), 500
+    
+# 4. API to fetch quiz preview data ❤️❤️❤️❤️❤️
+@professor_bp.route('/quiz-preview/<token>', methods=['GET'])
+@professor_required
+def get_quiz_preview_api(token):
+    try:
+        quiz_data = quiz_service.get_quiz_preview_details(token)
+        
+        if not quiz_data:
+            return jsonify({"message": "Quiz not found or invalid token"}), 404
+            
+        return jsonify(quiz_data), 200
+    except Exception as e:
+        print(f"Preview Error: {e}")
+        return jsonify({"message": "Internal Server Error"}), 500
 
 # 5. API to fetch questions for quiz creation
 @professor_bp.route('/questions', methods=['GET'])
@@ -244,12 +241,12 @@ def get_programs():
             FROM program 
             WHERE school_id = %s
         """
-        cursor.execute("SELECT id, program_name FROM  WHERE school_id = %s", (school_id,))
+        cursor.execute("SELECT id, program_name FROM program WHERE school_id = %s", (school_id,))
         data = cursor.fetchall()
         return jsonify(data), 200
     except Exception as e:
-        print(f"Error fetching : {e}")
-        return jsonify({"message": "Database error fetching ."}), 500
+        print(f"Error fetching programs: {e}")
+        return jsonify({"message": "Database error fetching programs."}), 500
     finally:
         cursor.close()
         conn.close()#vaidehi
@@ -258,6 +255,7 @@ def get_programs():
 @professor_required
 def fetch_departments_list_view(): 
     program_id_raw = request.args.get('program_id')
+    print(f"DEBUG: Fetching departments for Program ID: {program_id_raw}")
     if not program_id_raw:
         return jsonify([]), 200
 
@@ -280,46 +278,6 @@ def fetch_departments_list_view():
     finally:
         cursor.close()
         conn.close()
-# @professor_bp.route('/departments', methods=['GET'])
-# @professor_required
-# def fetch_departments_list_view(): 
-#     # 1. Capture the selected program ID from the React frontend
-#     program_id_raw = request.args.get('program_id')
-    
-#     if not program_id_raw:
-#         return jsonify([]), 200
-
-#     conn = None
-#     cursor = None
-#     try:
-#         program_id_int = int(program_id_raw)
-
-#         conn = get_db_connection()
-#         cursor = conn.cursor(pymysql.cursors.DictCursor)
-        
-#         # 🚀 THE JOIN FIX: 
-#         # We select the actual department data (d)
-#         # by joining with the junction table (dp) 
-#         # using the matching dept_id and the selected program_id.
-#         sql = """
-#             SELECT d.id, d.dept_name 
-#             FROM department d
-#             JOIN dept_program dp ON d.id = dp.dept_id
-#             WHERE dp.program_id = %s
-#         """
-        
-#         cursor.execute(sql, (program_id_int,))
-#         data = cursor.fetchall()
-        
-#         # This will return the list of departments to your frontend dropdown
-#         return jsonify(data), 200
-
-#     except Exception as e:
-#         print(f"!!! Error in fetch_departments_list_view: {e}")
-#         return jsonify({"message": "Database query error"}), 500
-#     finally:
-#         if cursor: cursor.close()
-#         if conn: conn.close()#vaidehi
  
 
 @professor_bp.route('/courses', methods=['GET'])
@@ -328,6 +286,8 @@ def fetch_courses_list_view():
     dept_id_raw = request.args.get('dept_id')
     semester_id_raw = request.args.get('semester')
     
+    print(f"DEBUG: Courses req -> Dept: {dept_id_raw}, Sem: {semester_id_raw}")
+
     if not dept_id_raw or not semester_id_raw:
         return jsonify([]), 200
 

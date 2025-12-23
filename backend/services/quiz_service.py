@@ -283,6 +283,7 @@ def update_question(question_id, data):
     finally:
         cursor.close()
         conn.close()
+
 def fetch_questions_by_course(course_id):
     """Fetches full question details for a specific course ID."""
     conn = get_db_connection()
@@ -376,91 +377,109 @@ def fetch_questions_by_course(course_id):
 #     return list(questions_map.values())
 # Vaidehi Changes
         
-# 3. Generate and Save Quiz
-def generate_and_save_quiz(teacher_id):
+# 3. Generate and Save Quiz  ❤️❤️❤️❤️❤️
+def generate_and_save_quiz(teacher_id, course_id):
     conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor) 
-    
-    # teacher_id = None
-    quiz_id = None
-
-
-  
-    try:    
-        # ✅ Filter questions by the logged-in teacher
-        cursor.execute("""
-            SELECT qb.id 
-            FROM question_bank qb
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 1. Fetch 10 random questions for THIS teacher AND THIS course
+        query = """
+            SELECT qb.id FROM question_bank qb
             JOIN question_employee qe ON qb.id = qe.question_id
-            WHERE qe.employee_id = %s
-        """, (teacher_id,))
-        all_questions = cursor.fetchall()
-
-        all_ids = [q['id'] for q in all_questions]
-        SAMPLE_SIZE = 5
-        
-        print(f"DEBUG: Total questions available for teacher {teacher_id}: {len(all_ids)}")
-        
-        if not all_ids:
-            print("WARNING: No questions found in question_bank!")
-            return None 
-
-        selected_ids = random.sample(all_ids, min(SAMPLE_SIZE, len(all_ids)))
-        print(f"DEBUG: Selected question IDs: {selected_ids}")
-
-        unique_link_id = str(uuid.uuid4())
-        quiz_title = f"New Quiz - {datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        sql_quiz = """
-            INSERT INTO generated_quizzes 
-                (teacher_id, quiz_title, quiz_status, total_questions, total_marks, time_limit, quiz_link, scheduled_start_time, scheduled_end_time)
-            VALUES 
-                (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            JOIN question_course qc ON qb.id = qc.question_id
+            WHERE qe.employee_id = %s AND qc.course_id = %s
+            ORDER BY RAND() LIMIT 10
         """
-        
-        QUIZ_STATUS = 'DRAFT'
-        TOTAL_QUESTIONS = len(selected_ids)
-        TOTAL_MARKS = TOTAL_QUESTIONS * 10 
-        TIME_LIMIT = 10 
-        SCHEDULED_START = datetime.now()
-        SCHEDULED_END = datetime.now() + timedelta(days=7) 
+        cursor.execute(query, (teacher_id, course_id))
+        selected_questions = cursor.fetchall()
 
-        cursor.execute(sql_quiz, (
-            teacher_id,
-            quiz_title,
-            QUIZ_STATUS,
-            TOTAL_QUESTIONS,
-            TOTAL_MARKS,
-            TIME_LIMIT,
-            unique_link_id, 
-            SCHEDULED_START,
-            SCHEDULED_END
-        ))
+        if not selected_questions:
+            return None
+        
+        # 2. Generate unique token for the link
+        quiz_token = str(uuid.uuid4())[:12]
+        # This link points to your React route where the preview/quiz happens
+        quiz_link = f"http://localhost:3000/take-quiz/{quiz_token}"
+        
+        # 3. Store Quiz Metadata
+        insert_quiz = """
+            INSERT INTO quizzes (teacher_id, course_id, quiz_title, quiz_link, quiz_token, quiz_status)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_quiz, 
+                       (teacher_id, 
+                        course_id, 
+                        f"Quiz for Course {course_id}", 
+                        quiz_link, 
+                        quiz_token, "active"
+                        ))
         quiz_id = cursor.lastrowid
-        print(f"DEBUG: Created quiz with ID: {quiz_id}, Title: {quiz_title}")
-        print(f"DEBUG: Quiz settings - Status: {QUIZ_STATUS}, Questions: {TOTAL_QUESTIONS}, Marks: {TOTAL_MARKS}, Time: {TIME_LIMIT} min")
-        conn.commit()
-        
-        sql_link_questions = "INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)"
-        
-        question_links = [(quiz_id, q_id) for q_id in selected_ids]
 
-        cursor.executemany(sql_link_questions, question_links)
+        # 4. Save specific questions for this unique quiz instance
+        for q in selected_questions:
+            cursor.execute(
+                "INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)", 
+                (quiz_id, q['id'])
+            )
+
         conn.commit()
-        print(f"DEBUG: Successfully linked {len(question_links)} questions to quiz {quiz_id}")
+        return {"id": quiz_id, "quiz_link": quiz_link, "token": quiz_token}
+    finally:
+        conn.close()
+
+# 4. Fetch Quiz Preview Details ❤️❤️❤️❤️❤️
+def get_quiz_preview_details(token):
+    """Fetches quiz metadata and questions for the preview page."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # Note: Using correct table casing based on your previous SQL
+        sql = """
+            SELECT 
+                q.quiz_title, 
+                qb.id as question_id, 
+                qb.question_txt, 
+                am.option_text, 
+                am.is_correct
+            FROM quizzes q
+            JOIN Quiz_Questions_Generated qqg ON q.id = qqg.quiz_id
+            JOIN Question_Bank qb ON qqg.question_id = qb.id
+            JOIN Answer_Map am ON qb.id = am.question_id
+            WHERE q.quiz_token = %s
+        """
+        cursor.execute(sql, (token,))
+        results = cursor.fetchall()
         
-        # Fetch and return the complete quiz details
-        cursor.execute("""
-            SELECT * FROM generated_quizzes 
-            WHERE id = %s
-        """, (quiz_id,))
-        quiz_details = cursor.fetchone()
+        if not results:
+            return None
+
+        # Restructure data: Group options under questions
+        quiz_data = {
+            "title": results[0]['quiz_title'],
+            "questions": {}
+        }
         
-        return quiz_details 
+        for row in results:
+            q_id = row['question_id']
+            if q_id not in quiz_data['questions']:
+                quiz_data['questions'][q_id] = {
+                    "id": q_id,
+                    "text": row['question_txt'],
+                    "options": []
+                }
+            quiz_data['questions'][q_id]['options'].append({
+                "text": row['option_text'],
+                "is_correct": row['is_correct']
+            })
+            
+        # Convert dictionary to list
+        quiz_data['questions'] = list(quiz_data['questions'].values())
+        return quiz_data
         
     finally:
         cursor.close()
         conn.close()
+        
 def delete_question(question_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -530,5 +549,3 @@ def delete_question(question_id):
 
 #         🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
 #         Testing generate_and_save_quiz
-
-
