@@ -78,6 +78,47 @@ def add_question_api():
         print(f"Error during question insertion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
 
+# API to update an existing question
+@professor_bp.route('/update_question/<int:question_id>', methods=['PUT'])
+@professor_required
+def update_question_api(question_id):
+    print(f"Received request to update question ID: {question_id}.")
+    data = request.get_json() 
+    print(f"Request data: {data}")
+    
+    required_keys = ['text', 'options', 'correct_index', 'option_ids']
+    if not all(key in data for key in required_keys):
+        return jsonify({"message": f"Missing required fields"}), 400
+
+    try:
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        quiz_service.update_question(question_id, data)
+        return jsonify({"message": "Question updated successfully!"}), 200
+        
+    except Exception as e:
+        print(f"Error during question update: {str(e)}")
+        return jsonify({"message": "Internal server error during database operation."}), 500
+
+# API to delete a question
+@professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE'])
+@professor_required
+def delete_question_api(question_id):
+    print(f"Received request to delete question ID: {question_id}.")
+    try:
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+        
+        quiz_service.delete_question(question_id)
+        return jsonify({"message": "Question deleted successfully!"}), 200
+        
+    except Exception as e:
+        print(f"Error during question deletion: {str(e)}")
+        return jsonify({"message": "Internal server error during database operation."}), 500
+
 # 4. API to generate a quiz
 @professor_bp.route('/generate', methods=['POST'])
 @professor_required

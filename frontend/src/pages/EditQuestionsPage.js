@@ -80,8 +80,13 @@ export default function EditQuestionPage({ isNew }) {
     };
 
     try {
+      if (!isNew && questionId) {
+        const response = await updateQuestion(questionId, dataToSend);
+        alert("Question updated successfully!");
+      } else {
         const response = await addQuestion(dataToSend); 
         alert("Question saved successfully!");
+      }
     } catch (error) {
         console.error("Failed to add question:", error.response ? error.response.data : error.message);
         alert("Error saving question. Please try again.");
