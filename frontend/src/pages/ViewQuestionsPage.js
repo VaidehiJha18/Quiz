@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { 
-//   fetchSchool, fetchPrograms, fetchDepartments, fetchCourses, 
-//   fetchQuestionsByCourse, deleteQuestion 
-// } from '../api/apiService'; 
+import Dropdown from '../components/layout/Dropdown';
 import Button from '../components/forms/Button'; 
 import { Link } from 'react-router-dom';
 import { 
@@ -11,38 +8,11 @@ import {
   fetchPrograms, 
   fetchDepartments, 
   fetchCourses, 
-  fetchQuestionsByCourse, // Kept for fetching by course
-  deleteQuestion,       // Kept for deleting questions
-  // If you use fetchQuestions (to load all questions initially), include it here too:
+  fetchQuestionsByCourse, 
+  deleteQuestion,       
   // fetchQuestions,
-} from '../api/apiService'; //vaidehi
+} from '../api/apiService'; 
 
-// const handleCourseChange = async (e) => {
-//     const courseId = e.target.value;
-//     setSelections({ ...selections, course: courseId });
-    
-//     if (courseId) {
-//         setLoading(true);
-//         try {
-//             // 🚀 Call the new API function
-//             const res = await fetchQuestionsByCourse(courseId);
-            
-//             // Check if data is an array or an object (to be robust)
-//             const data = Array.isArray(res.data) ? res.data : Object.values(res.data || {});
-            
-//             // 🚀 Update the questions state
-//             setQuestions(data); 
-//         } catch (err) { 
-//             console.error("Error fetching questions by course:", err); 
-//             setQuestions([]);
-//         }
-//         finally { 
-//             setLoading(false); 
-//         }
-//     } else {
-//         setQuestions([]); // Clear questions if course is deselected
-//     }
-// };//vaidehi
 export default function ViewQuestionsPage() {
   const navigate = useNavigate();
   
@@ -52,7 +22,7 @@ export default function ViewQuestionsPage() {
   });
 
   const [lists, setLists] = useState({
-    School: [], programs: [], departments: [], semesters: [1, 2, 3, 4, 5, 6, 7, 8], courses: []
+    schools: [], programs: [], departments: [], semesters: [1, 2, 3, 4, 5, 6, 7, 8], courses: []
   });
 
   const [questions, setQuestions] = useState([]);
@@ -66,7 +36,7 @@ export default function ViewQuestionsPage() {
   const loadSchools = async () => {
     try {
       const res = await fetchSchools();
-      setLists(prev => ({ ...prev, School: res.data || [] }));
+      setLists(prev => ({ ...prev, schools: res.data || [] }));
     } catch (err) { console.error(err); }
   };
 
@@ -160,6 +130,14 @@ const handleDelete = async (question_id) => {
   }
 };
 
+  const filterHandlers = {
+    handleSchoolChange,
+    handleDeptChange,
+    handleProgramChange,
+    handleSemesterChange,
+    handleCourseChange
+  };
+
   return (
     <main className="main-content" style={styles.mainContainer}>
       
@@ -173,74 +151,12 @@ const handleDelete = async (question_id) => {
       </div>
 
       {/* --- FILTER CARD (UPDATED LAYOUT) --- */}
-      <div style={styles.filterCard}>
-        <h3 style={{marginBottom: '20px', color: '#444'}}>"Filter Options"</h3>
-        
-        {/* ✅ GRID LAYOUT START */}
-        <div style={styles.gridContainer}>
-            
-            {/* Row 1: School & Department */}
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select School:</label>
-                <select style={styles.select} value={selections.school} onChange={handleSchoolChange}>
-                    <option value="">Select a school</option>
-                    {lists.School.map(item => <option key={item.id} value={item.id}>{item.school_name}</option>)}
-                </select>
-            </div>
-
-            {/* <div style={styles.inputGroup}>
-                 <label style={styles.label}>Select Department:</label>
-                 <select style={styles.select} value={selections.department} onChange={handleDeptChange} disabled={!selections.program}>
-                    <option value="">Select a department</option>
-                    {lists.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-            </div> */}
-
-            <div style={styles.inputGroup}>
-                 <label style={styles.label}>Select Department:</label>
-                 <select 
-                    style={styles.select} 
-                    value={selections.department} 
-                    onChange={handleDeptChange} 
-                    disabled={!selections.program}
-                 >
-                    <option value="">Select a department</option>
-                    {lists.departments.map(item => 
-                        <option key={item.id} value={item.id}>
-                            {item.dept_name}  
-                        </option>
-                    )}
-                </select>
-            </div> 
-            {/* vaidehi changes */}
-
-            {/* Row 2: Program & Semester */}
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select Program:</label>
-                <select style={styles.select} value={selections.program} onChange={handleProgramChange} disabled={!selections.school}>
-                    <option value="">Select a program</option>
-                    {lists.programs.map(item => <option key={item.id} value={item.id}>{item.program_name}</option>)}
-                </select>
-            </div>
-
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select Semester:</label>
-                <select style={styles.select} value={selections.semester} onChange={handleSemesterChange} disabled={!selections.department}>
-                    <option value="">Select a semester</option>
-                    {lists.semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
-                </select>
-            </div>
-
-            {/* Row 3: Course (Full Width) */}
-            <div style={{...styles.inputGroup, gridColumn: '1 / -1'}}>
-                <label style={styles.label}>Select Course:</label>
-                <select style={styles.select} value={selections.course} onChange={handleCourseChange} disabled={!selections.semester}>
-                    <option value="">Select a course</option>
-                    {lists.courses.map(item => <option key={item.id} value={item.id}>{item.course_name}</option>)}
-                </select>
-            </div>
-
-        </div>
+        <div className="page-container">
+          <Dropdown
+            lists={lists} 
+            selections={selections} 
+            handlers={filterHandlers}
+          />
         {/* ✅ GRID LAYOUT END */}
       </div>
 
@@ -296,58 +212,20 @@ const handleDelete = async (question_id) => {
   );
 }
 
-// --- UPDATED STYLES ---
 const styles = {
+  // Add these new styles
   mainContainer: {
-    padding: '30px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    boxSizing: 'border-box'
+    padding: '2rem 3rem',
+    width: '100%'
   },
-  headerRow: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: '25px' 
-  },
-
-  // FILTER CARD STYLES
-  filterCard: {
-    backgroundColor: '#fff',
-    padding: '30px',
-    borderRadius: '12px',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
-    marginBottom: '30px',
-    width: '100%',
-    boxSizing: 'border-box'
-  },
-  gridContainer: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr', // 2 Columns
-    gap: '20px', 
-  },
-  inputGroup: {
+  headerRow: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  },
-  label: {
-    fontWeight: '600',
-    color: '#555',
-    fontSize: '0.9rem',
-    marginLeft: '2px'
-  },
-  select: {
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #e0e0e0',
-    fontSize: '1rem',
-    backgroundColor: '#f9f9f9',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     width: '100%',
-    outline: 'none',
-    cursor: 'pointer'
+    marginBottom: '2rem'
   },
-
+  
   // TABLE STYLES
   tableCard: {
     backgroundColor: '#fff',

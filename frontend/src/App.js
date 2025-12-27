@@ -21,7 +21,7 @@ import QuizPreviewPage from './pages/QuizPreviewPage';
 import ProfessorLayout from './components/layout/ProfessorLayout';
 
 function App() {
-  return <StudentDashboard />;
+  // return <StudentDashboard />;
   return (
     <div className="App">
       <Routes>
