@@ -22,10 +22,16 @@ class Config:
     DB_PASSWORD = os.environ.get('DB_PASSWORD', 'AVNS_IGyQyvOs9EJELlKx9h4')
     DB_DATABASE = os.environ.get('DB_DATABASE', 'dbquiz')
     DB_PORT = int(os.environ.get('DB_PORT', 26056))
+
+    # SQLALCHEMY_DATABASE_URI
+    SQLALCHEMY_DATABASE_URI = (
+        f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}'
+    )
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Flask
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'default-dev-secret-key')
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'a_new_secret_key_to_break_the_old_cookie_12345')
     DEBUG = True
-
-    SESSION_COOKIE_SECURE = False  
+    SESSION_COOKIE_SECURE = True  
     
