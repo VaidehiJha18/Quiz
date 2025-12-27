@@ -297,68 +297,6 @@ def get_question_by_id(question_id):
         cursor.close()
         conn.close()    
 
-
-def update_question(question_id, data):
-    """Updates the question text and re-saves all options/answers in a transaction."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # 1. Update the question text in question_bank
-    sql_update_question = """
-        UPDATE question_bank SET question_txt = %s WHERE id = %s
-    """
-    
-    # 2. Delete existing answers/options from answer_map
-    sql_delete_options = """
-        DELETE FROM answer_map WHERE question_id = %s
-    """
-    
-    # 3. Insert the new/updated options into answer_map
-    sql_insert_options = """
-        INSERT INTO answer_map (question_id, option_text, is_correct)
-        VALUES (%s, %s, %s)
-    """
-
-    try:
-        # Start Transaction
-        conn.begin()
-        
-        # --- Update Question Bank ---
-        cursor.execute(sql_update_question, (data['text'], question_id))
-
-        # --- Delete Old Options ---
-        cursor.execute(sql_delete_options, (question_id,))
-
-        # --- Insert New Options ---
-        correct_index = int(data['correct_index'])
-        
-        # Note: We use data['options'] which includes the empty strings for up to 4 options
-        for index, option_text in enumerate(data['options']):
-            # Skip inserting empty options if they were not provided
-            if not option_text.strip():
-                continue
-                
-            is_correct_flag = 1 if index == correct_index else 0
-            
-            cursor.execute(sql_insert_options, (
-                question_id,
-                option_text,
-                is_correct_flag,
-            ))
-            
-        # Commit all changes if successful
-        conn.commit()
-        return True
-        
-    except Exception as e:
-        conn.rollback() # Revert all changes if any step failed
-        print(f"Database error during question update: {e}")
-        return False
-
-    finally:
-        cursor.close()
-        conn.close()
-
 def publish_quiz(quiz_id):
     conn = get_db_connection()
     cursor = conn.cursor()

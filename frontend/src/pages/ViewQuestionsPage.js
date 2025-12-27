@@ -141,12 +141,24 @@ const handleCourseChange = async (e) => {
   }
 };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this question?")) {
-      await deleteQuestion(id);
-      setQuestions(questions.filter(q => q.id !== id));
-    }
-  };
+const handleDelete = async (question_id) => {
+  if (!window.confirm("Delete this question?")) return;
+  if (!window.confirm("Are you sure you want to delete this question?")) return;
+
+  try {
+    console.log("Deleting question with ID:", question_id);
+
+    await deleteQuestion(question_id);
+
+    setQuestions(prev =>
+      prev.filter(q => q.question_id !== question_id)
+    );
+
+  } catch (error) {
+    console.error("Delete failed:", error.response || error.message);
+    alert("Failed to delete question");
+  }
+};
 
   return (
     <main className="main-content" style={styles.mainContainer}>
@@ -251,7 +263,7 @@ const handleCourseChange = async (e) => {
           <tbody>
             {questions.length > 0 ? (
               questions.map((q) => (
-                <tr key={q.id} style={styles.tableRow}>
+                <tr key={q.question_id} style={styles.tableRow}>
                   <td style={styles.td}>{q.question_id}</td>
                   <td style={styles.td}>{q.question_txt}</td>
                   <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
@@ -263,8 +275,8 @@ const handleCourseChange = async (e) => {
                   </td>
                   <td style={styles.td}>
                     <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={() => navigate(`/professor/questions/edit/${q.id}`)} style={styles.editBtn}>Edit</button>
-                        <button onClick={() => handleDelete(q.id)} style={styles.deleteBtn}>Del</button>
+                        <button onClick={() => navigate(`/professor/questions/edit/${q.question_id}`)} style={styles.editBtn}>Edit</button>
+                        <button onClick={() => handleDelete(q.question_id)} style={styles.deleteBtn}>Del</button>
                     </div>
                   </td>
                 </tr>
