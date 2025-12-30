@@ -37,7 +37,6 @@ def get_courses_for_teacher(teacher_id):
         conn.close()
 
 # 2. Add a New Question           ❤️❤️❤️❤️❤️ 
-# 2. Add a New Question
 def insert_question(form_data, teacher_id): 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -463,28 +462,6 @@ def get_quiz_preview_details(token):
     finally:
         cursor.close()
         conn.close()
-
-# # 9. Delete Question
-# def delete_question(question_id):
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#     try:
-#         # Delete related data first due to foreign key constraints
-#         cursor.execute("DELETE FROM answer_map WHERE question_id = %s", (question_id,))
-#         cursor.execute("DELETE FROM question_course WHERE question_id = %s", (question_id,))
-#         # Delete the question itself
-#         delete_count = cursor.execute("DELETE FROM question_bank WHERE id = %s", (question_id,))
-        
-#         conn.commit()
-#         return delete_count > 0
-
-#     except Exception as e:
-#         conn.rollback()
-#         print(f"Transaction failed for question deletion (ID {question_id}): {e}")
-#         return False
-#     finally:
-#         cursor.close()
-#         conn.close()
         
 # ==============================================================================================
 # if __name__ == "__main__":

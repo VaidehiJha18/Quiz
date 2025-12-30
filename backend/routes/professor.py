@@ -10,19 +10,23 @@ import traceback
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
 # --- Decorator: Ensure User is a Professor ---
+from functools import wraps
+from flask import request, session, jsonify
+
 def professor_required(f):
     @wraps(f)
     def wrap(*args, **kwargs):
+        # ✅ Allow CORS preflight requests
+        if request.method == "OPTIONS":
+            return '', 200
+
         if session.get('role') != 'professor':
             return jsonify({"message": "Unauthorized"}), 403
+
         return f(*args, **kwargs)
-    wrap.__name__ = f.__name__
     return wrap
 
 # --- 1. Dashboard & Course Data Endpoints ---
-
-@professor_bp.route('/my-courses', methods=['GET'])
-@professor_required
 # def get_quizzes_api():
 #     try:
 #         teacher_id = session.get('id')
@@ -84,22 +88,22 @@ def professor_required(f):
 #         print(f"Error during question update: {str(e)}")
 #         return jsonify({"message": "Internal server error during database operation."}), 500
 
-# # API to delete a question
-# @professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE'])
-# @professor_required
-# def delete_question_api(question_id):
-#     print(f"Received request to delete question ID: {question_id}.")
-#     try:
-#         teacher_id = session.get('id')
-#         if not teacher_id:
-#             return jsonify({"message": "User ID not found in session. Please log in again."}), 400
+# API to delete a question
+@professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE','OPTIONS'])
+@professor_required
+def delete_question_api(question_id):
+    print(f"Received request to delete question ID: {question_id}.")
+    try:
+        teacher_id = session.get('id')
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session. Please log in again."}), 400
         
-#         quiz_service.delete_question(question_id)
-#         return jsonify({"message": "Question deleted successfully!"}), 200
+        quiz_service.delete_question(question_id)
+        return jsonify({"message": "Question deleted successfully!"}), 200
         
-#     except Exception as e:
-#         print(f"Error during question deletion: {str(e)}")
-#         return jsonify({"message": "Internal server error during database operation."}), 500
+    except Exception as e:
+        print(f"Error during question deletion: {str(e)}")
+        return jsonify({"message": "Internal server error during database operation."}), 500
 
 # # 4. API to generate a quiz
 # @professor_bp.route('/generate', methods=['POST'])
@@ -236,6 +240,8 @@ def professor_required(f):
 #         print(f"Error fetching questions by course: {e}")
 #         return jsonify({"message": "Internal server error fetching questions."}), 500
 # # vaidehi
+@professor_bp.route('/my-courses', methods=['GET'])
+@professor_required
 def get_my_courses():
     teacher_id = session.get('id')
     courses = quiz_service.get_courses_for_teacher(teacher_id)
