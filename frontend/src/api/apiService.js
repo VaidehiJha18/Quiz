@@ -23,7 +23,8 @@ export const fetchQuestions = () => api.get('/prof/questions');
 export const addQuestion = (data) => api.post('/prof/add_questions', data);
 export const deleteQuestion = (id) => api.delete(`/prof/delete_question/${id}`);
 export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
-export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);//Vaidehi Changes
+export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);
+export const fetchQuizQuestions = (token) => api.get(`/prof/take-quiz/${token}`);
 
 // --- Dropdown API Calls (Add these to the bottom of apiService.js) ---
 

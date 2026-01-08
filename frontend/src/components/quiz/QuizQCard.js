@@ -14,14 +14,15 @@ const QuizQCard = ({ question, selectedAnswer, onAnswerSelect, onMarkReview, isM
       <div className="options-container">
         {question.options.map((option, index) => (
           <div
-            key={index}
-            className={`quiz-option ${selectedAnswer === index ? 'selected' : ''}`}
-            onClick={() => onAnswerSelect(index)}
+            key={option.id} // Use the database ID as the key
+            className={`quiz-option ${selectedAnswer === option.id ? 'selected' : ''}`} // Compare using ID
+            onClick={() => onAnswerSelect(option.id)} // Pass the ID to the select handler
           >
             <div className="option-indicator">
               {String.fromCharCode(65 + index)}
             </div>
-            <span className="option-text">{option}</span>
+            {/* FIX: Render option.text instead of the whole option object */}
+            <span className="option-text">{option.text}</span> 
           </div>
         ))}
       </div>

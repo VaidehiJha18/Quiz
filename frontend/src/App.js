@@ -34,8 +34,10 @@ function App() {
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/quiz/:quizId" element={<QuizPage />} />
         <Route path="/student/results" element={<ResultsPage role="student" />} />
+        <Route path="/take-quiz/:token" element={<Quiz />} />
 
-        <Route path="/take-quiz/:token" element={<QuizPreviewPage />} />
+        {/* Quiz Preview Route, for some reason it doesn't work when grouped with professor routes but works when outside it */}
+        <Route path="/quiz-preview/:token" element={<QuizPreviewPage />} /> 
          
         {/* --- Professor Routes (Now wrapped in the new layout) --- */}
         {/* ✅ 2. WRAP all professor pages inside the ProfessorLayout route */}

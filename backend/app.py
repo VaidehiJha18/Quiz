@@ -1,4 +1,4 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, jsonify
 from flask_cors import CORS  
 from .config import Config
 import os
@@ -58,10 +58,12 @@ def create_app(config_class=Config):
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
-        # Optimization: skip the file serving if it's an API route
-        if path.startswith('auth/') or path.startswith('prof/') or path.startswith('student/'):
-            pass 
+        # If the path starts with an API prefix, we should NOT serve index.html.
+        # If it reached here, it means the specific Blueprint route doesn't exist.
+        if path.startswith(('auth/', 'prof/', 'student/')):
+            return jsonify({"message": f"API Route '/{path}' not found"}), 404
         
+        # Otherwise, serve the React app
         return send_from_directory(app.template_folder, 'index.html')
 
     return app

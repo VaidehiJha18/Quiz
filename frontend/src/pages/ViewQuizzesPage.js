@@ -42,7 +42,6 @@ export default function ViewQuizzesPage() {
         setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
         alert('Quiz deleted successfully!');
       } else {
-        // Optimistic update for UI even if backend route is missing/failing for now
         setQuizzes(quizzes.filter(quiz => quiz.id !== quizId)); 
         alert('Quiz removed from list.');
       }
@@ -53,8 +52,7 @@ export default function ViewQuizzesPage() {
   };
 
   const handleReviewEdit = (token) => {
-    // 🚀 FIX: Navigate to the correct preview route using the token
-    window.location.href = `/take-quiz/${token}`;
+    window.location.href = `/quiz-preview/${token}`;
   };
 
   const formatDate = (dateString) => {

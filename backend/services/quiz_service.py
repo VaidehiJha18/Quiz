@@ -484,73 +484,56 @@ def get_quiz_preview_details(token):
 #         insert_question(form_data)
 
         # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
-        # Testing generate_and_save_quiz
 
 
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
 # STUDENT SIDE
-def fetch_quiz_by_link(quiz_link):
+def get_quiz_for_student(token):
     conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor) 
-    
-    try:
-        sql_quiz_details = """
-            SELECT 
-                gq.id AS quiz_id,
-                gq.quiz_title,
-                gq.time_limit,
-                qqg.question_id,
-                qb.question_txt,
-                am.id AS option_id,
-                am.option_text
-            FROM 
-                quizzes gq
-            JOIN 
-                quiz_questions_generated qqg ON gq.id = qqg.quiz_id
-            JOIN 
-                question_bank qb ON qqg.question_id = qb.id
-            JOIN 
-                answer_map am ON qb.id = am.question_id
-            WHERE 
-                gq.quiz_link = %s
-        """
+    cursor = conn.cursor()
 
-        cursor.execute(sql_quiz_details, (quiz_link,))
-        results = cursor.fetchall()
+    query = """
+        SELECT q.quiz_title, qb.id as question_id, qb.question_txt, 
+               am.id as option_id, am.option_text
+        FROM quizzes q
+        JOIN quiz_questions_generated qqg ON q.id = qqg.quiz_id
+        JOIN question_bank qb ON qqg.question_id = qb.id
+        JOIN answer_map am ON qb.id = am.question_id
+        WHERE q.quiz_token = %s
+    """
+    cursor.execute(query, (token,))
+    quiz_info = cursor.fetchall()
 
-    except Exception as e:
-        print(f"Query failed to execute: {e}")
-        return None
-        
-    finally:
-        cursor.close()
-        conn.close()
+    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
+    # Check Question and Option Counts of a Token, for debugging
+    # unique_question_ids = {row['question_id'] for row in quiz_info}
+    # print(f"Total rows (options) returned: {len(quiz_info)}")
+    # print(f"Total unique questions: {len(unique_question_ids)}")
+    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
 
-    if not results:
-        return None
+    if not quiz_info:
+        return 'Invalid token or no quiz found.'
 
-    quiz_info = {
-        'quiz_id': results[0]['quiz_id'],
-        'quiz_title': results[0]['quiz_title'],
-        'time_limit': results[0]['time_limit'],
-        'questions': {}
+    quiz_data = {
+        "title": quiz_info[0]['quiz_title'],
+        "questions": {}
     }
 
-    for row in results:
+    for row in quiz_info:
         q_id = row['question_id']
-        
-        if q_id not in quiz_info['questions']:
-            quiz_info['questions'][q_id] = {
-                'question_txt': row['question_txt'],
-                'options': []
+        if q_id not in quiz_data['questions']:
+            quiz_data['questions'][q_id] = {
+                "id": q_id,
+                "text": row['question_txt'],
+                "options": []
             }
-        
-        quiz_info['questions'][q_id]['options'].append({
-            'option_id': row['option_id'],
-            'option_text': row['option_text']
+        quiz_data['questions'][q_id]['options'].append({
+            "id": row['option_id'],
+            "text": row['option_text']
         })
 
-    return quiz_info
+    quiz_data['questions'] = list(quiz_data['questions'].values())
+    return quiz_data
 
 def save_student_quiz_responses(quiz_id, student_id, responses):
     conn = get_db_connection()
@@ -581,3 +564,14 @@ def save_student_quiz_responses(quiz_id, student_id, responses):
 def grade_student_quiz(quiz_id, student_id):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+# ==============================================================================================
+# if __name__ == "__main__":
+#     app = create_app()
+#     with app.app_context():
+#         # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
+#         # Testing get_quiz_for_student
+#         test_token = "fac0a6d4-71b"
+#         print(get_quiz_for_student(test_token))
+#         # De-comment --> #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
+#         #command to run ('python -m backend.services.quiz_service)

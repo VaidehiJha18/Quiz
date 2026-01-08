@@ -2,71 +2,111 @@ import QuizSidebar from '../components/quiz/QuizSidebar';
 import QuestionIndicator from '../components/quiz/QuestionIndicator';
 import QuizQCard from '../components/quiz/QuizQCard';
 import './Quiz.css';
-import React, { useState } from 'react';
+// import React, { useState } from 'react';
+
+// const Quiz = () => {
+//   // Sample quiz data - Take from API
+//   const quizData = {
+//     title: "Data Structures Quiz",
+//     questions: [
+//       {
+//         text: "What is the time complexity of searching in a balanced Binary Search Tree?",
+//         options: ["O(n)", "O(log n)", "O(n²)", "O(1)"]
+//       },
+//       {
+//         text: "Which data structure uses LIFO (Last In First Out) principle?",
+//         options: ["Queue", "Stack", "Array", "Linked List"]
+//       },
+//       {
+//         text: "What is the maximum number of nodes at level 'L' in a binary tree?",
+//         options: ["2^L", "2^(L-1)", "L^2", "2L"]
+//       },
+//       {
+//         text: "Which sorting algorithm has the best average time complexity?",
+//         options: ["Bubble Sort", "Selection Sort", "Merge Sort", "Insertion Sort"]
+//       },
+//       {
+//         text: "What is a hash collision?",
+//         options: [
+//           "When two keys hash to the same index",
+//           "When a hash function fails",
+//           "When a hash table is full",
+//           "When hash values are negative"
+//         ]
+//       },
+//       {
+//         text: "Which traversal visits the root node first?",
+//         options: ["Inorder", "Preorder", "Postorder", "Level Order"]
+//       },
+//       {
+//         text: "What is the space complexity of a recursive fibonacci function?",
+//         options: ["O(1)", "O(n)", "O(log n)", "O(n²)"]
+//       },
+//       {
+//         text: "Which data structure is best for implementing a priority queue?",
+//         options: ["Array", "Linked List", "Heap", "Stack"]
+//       }
+//     ]
+//   };
+
+//   const [currentQuestion, setCurrentQuestion] = useState(0);
+//   const [answers, setAnswers] = useState(Array(quizData.questions.length).fill(null));
+//   const [reviewFlags, setReviewFlags] = useState(Array(quizData.questions.length).fill(false));
+//   const [visitedQuestions, setVisitedQuestions] = useState(new Set([0])); // Track visited questions, start with question 0
+
+import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { fetchQuizQuestions } from '../api/apiService';
 
 const Quiz = () => {
-  // Sample quiz data - Take from API
-  const quizData = {
-    title: "Data Structures Quiz",
-    questions: [
-      {
-        text: "What is the time complexity of searching in a balanced Binary Search Tree?",
-        options: ["O(n)", "O(log n)", "O(n²)", "O(1)"]
-      },
-      {
-        text: "Which data structure uses LIFO (Last In First Out) principle?",
-        options: ["Queue", "Stack", "Array", "Linked List"]
-      },
-      {
-        text: "What is the maximum number of nodes at level 'L' in a binary tree?",
-        options: ["2^L", "2^(L-1)", "L^2", "2L"]
-      },
-      {
-        text: "Which sorting algorithm has the best average time complexity?",
-        options: ["Bubble Sort", "Selection Sort", "Merge Sort", "Insertion Sort"]
-      },
-      {
-        text: "What is a hash collision?",
-        options: [
-          "When two keys hash to the same index",
-          "When a hash function fails",
-          "When a hash table is full",
-          "When hash values are negative"
-        ]
-      },
-      {
-        text: "Which traversal visits the root node first?",
-        options: ["Inorder", "Preorder", "Postorder", "Level Order"]
-      },
-      {
-        text: "What is the space complexity of a recursive fibonacci function?",
-        options: ["O(1)", "O(n)", "O(log n)", "O(n²)"]
-      },
-      {
-        text: "Which data structure is best for implementing a priority queue?",
-        options: ["Array", "Linked List", "Heap", "Stack"]
-      }
-    ]
-  };
-
+  const { token } = useParams();
+  const [quizData, setQuizData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // States that depend on question count
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState(Array(quizData.questions.length).fill(null));
-  const [reviewFlags, setReviewFlags] = useState(Array(quizData.questions.length).fill(false));
-  const [visitedQuestions, setVisitedQuestions] = useState(new Set([0])); // Track visited questions, start with question 0
+  const [answers, setAnswers] = useState([]);
+  const [reviewFlags, setReviewFlags] = useState([]);
+  const [visitedQuestions, setVisitedQuestions] = useState(new Set([0]));
 
-  // Calculate question status
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      try {
+        // Pass the token directly to your service
+        const response = await fetchQuizQuestions(token); 
+        const data = response.data; // Axios data
+        
+        setQuizData(data);
+        setAnswers(Array(data.questions.length).fill(null));
+        setReviewFlags(Array(data.questions.length).fill(false));
+      } catch (err) {
+        console.error("Failed to load quiz:", err);
+        setQuizData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQuiz();
+  }, [token]);
+
+  if (loading) return <div className="loading">Loading Quiz Questions...</div>;
+  if (!quizData) return <div className="error">Quiz not found.</div>;
+
+  // Now we can safely use quizData.questions.length
+  const totalQuestions = quizData.questions.length;
+
   const getQuestionStatus = (index) => {
     if (reviewFlags[index]) return 'review';
     if (answers[index] !== null) return 'answered';
-    if (visitedQuestions.has(index)) return 'unattempted'; // Visited but not answered
-    return 'unvisited'; // Never visited
+    if (visitedQuestions.has(index)) return 'unattempted';
+    return 'unvisited';
   };
 
   const questionStatuses = quizData.questions.map((_, index) => getQuestionStatus(index));
 
-  const handleAnswerSelect = (optionIndex) => {
+  const handleAnswerSelect = (optionId) => {
     const newAnswers = [...answers];
-    newAnswers[currentQuestion] = optionIndex;
+    newAnswers[currentQuestion] = optionId; // Store the ID from the database
     setAnswers(newAnswers);
   };
 
@@ -92,16 +132,36 @@ const Quiz = () => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const unanswered = answers.filter(a => a === null).length;
-    if (unanswered > 0) {
-      if (window.confirm(`You have ${unanswered} unanswered questions. Submit anyway?`)) {
-        alert('Quiz submitted! (In real app, this would save results)');
-      }
-    } else {
-      alert('Quiz submitted! (In real app, this would save results)');
+    if (unanswered > 0 && !window.confirm(`You have ${unanswered} unanswered questions. Submit anyway?`)) {
+      return;
     }
-  };
+
+    try {
+      const response = await fetch(`http://localhost:5000/prof/submit-quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: token,
+          // Map answers to a clean format: { question_id: selected_option_id }
+          responses: quizData.questions.reduce((acc, q, index) => {
+            acc[q.id] = answers[index];
+            return acc;
+          }, {})
+        }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      alert(`Quiz submitted successfully!`);
+      // Navigate to a "Thank You" or Results page
+      // window.location.href = '/quiz-completion';
+    }
+  } catch (err) {
+    console.error("Submission failed", err);
+  }
+};
 
   return (
     <div className="quiz-page-layout">

@@ -88,7 +88,8 @@ def professor_required(f):
 #         print(f"Error during question update: {str(e)}")
 #         return jsonify({"message": "Internal server error during database operation."}), 500
 
-# API to delete a question
+#⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
+# API to delete a question - Working ☑️
 @professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE','OPTIONS'])
 @professor_required
 def delete_question_api(question_id):
@@ -104,6 +105,9 @@ def delete_question_api(question_id):
     except Exception as e:
         print(f"Error during question deletion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
+    
+#⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
+
 
 # # 4. API to generate a quiz
 # @professor_bp.route('/generate', methods=['POST'])
@@ -422,6 +426,7 @@ def handle_single_question(id):
         except Exception as e:
             print(f"!!! ERROR during PUT for ID {id}: {e}")
             return jsonify({'message': 'Internal Server Error during update.'}), 500
+    # WHAT TO DO FOR DELETE? ALREADY A ROUTE ABOVE ❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔❔
     elif request.method == 'DELETE':
         try:
             success = quiz_service.delete_question(id) 
@@ -494,4 +499,49 @@ def quiz_preview(token):
         return jsonify(quiz_data), 200
     except Exception as e:
         print(f"Preview Error: {e}")
+        return jsonify({"message": "Internal Server Error"}), 500
+
+# Just to check quiz taking for student
+# Inside your professor routes file
+print("Registering professor take-quiz route...") # This should show in terminal on startup
+
+@professor_bp.route('/take-quiz/<token>', methods=['GET'])
+@professor_required
+def take_quiz(token):
+    print(f"Route hit with token: {token}") # If you don't see this, Flask didn't find the route
+    try:
+        quiz_data = quiz_service.get_quiz_for_student(token)
+        if not quiz_data:
+            return jsonify({"message": "Quiz not found or invalid token"}), 404
+        return jsonify(quiz_data), 200
+    except Exception as e:
+        print(f"Take Quiz Error: {e}")
+        return jsonify({"message": "Internal Server Error"}), 500
+    
+@professor_bp.route('/submit-quiz/<int:quiz_id>', methods=['POST'])
+@professor_required
+def submit_quiz(quiz_id):
+    try:
+        data = request.get_json()
+        student_answers = data.get('answers')
+        student_id = session.get('id')
+        
+        if not student_id:
+            return jsonify({"message": "User ID not found in session."}), 400
+        
+        if not student_answers:
+            return jsonify({"message": "No answers provided."}), 400
+        
+        result = quiz_service.submit_quiz_answers(quiz_id, student_id, student_answers)
+        
+        if not result:
+            return jsonify({"message": "Quiz submission failed."}), 500
+        
+        return jsonify({
+            "message": "Quiz submitted successfully.",
+            "score": result['score'],
+            "total": result['total']
+        }), 200
+    except Exception as e:
+        print(f"Submit Quiz Error: {e}")
         return jsonify({"message": "Internal Server Error"}), 500
