@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
-// import { useNavigate } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import FormInput from '../components/forms/FormInput';
 import Button from '../components/forms/Button';
-import { addQuestion, updateQuestion, fetchQuestions } from '../api/apiService';
+import { 
+    addQuestion, 
+    updateQuestion, 
+    fetchQuestionById,
+    fetchTeacherCourses  //  ❤️❤️❤️❤️❤️
+} from '../api/apiService'; //vaidehi changes
 
+import axios from 'axios'; //Vaidehi Changes
 export default function EditQuestionPage({ isNew }) {
   const { questionId } = useParams();
   const navigate = useNavigate(); //prii
@@ -12,30 +17,44 @@ export default function EditQuestionPage({ isNew }) {
   const [formData, setFormData] = useState({ 
     text: '', 
     options: ['', '', '', ''], 
-    correct: '' 
+    correct: '',
+    course_id: ''    //  ❤️❤️❤️❤️❤️
   });
 
-  // 1. Load Data on Edit
+  const [courses, setCourses] = useState([]); // 👈 Store courses list ❤️❤️❤️❤️❤️
+
+  // 1. Load Courses & Question Data
   useEffect(() => {
+    // A. Fetch the teacher's courses    ❤️❤️❤️❤️❤️
+    const loadCourses = async () => {
+        try {
+            const res = await fetchTeacherCourses();
+            setCourses(res.data);
+        } catch (err) {
+            console.error("Error loading courses:", err);
+        }
+    };
+    loadCourses();
+
+    // B. Load Question if editing
     if (!isNew && questionId) {
       const loadQuestion = async () => {
         try {
-          const res = await fetchQuestions();
-          const q = res.data.find((item) => item.id === parseInt(questionId));
+          const res = await fetchQuestionById(questionId);
+          const q = res.data;
           if (q) {
             const loadedOptions = q.options || [];
             while (loadedOptions.length < 4) loadedOptions.push("");
-
-            const correctIndex = loadedOptions.indexOf(q.correct);
-
+            
             setFormData({
-              text: q.text,
-              options: loadedOptions,
-              correct: correctIndex > -1 ? correctIndex.toString() : '', 
+                text: q.text,
+                options: loadedOptions,
+                correct: q.correct,
+                course_id: q.course_id || '' // Load saved course if available
             });
-          }
+        }
         } catch (err) {
-          console.error(err);
+          console.error("Error loading question:", err);
         }
       };
       loadQuestion();
@@ -57,6 +76,10 @@ export default function EditQuestionPage({ isNew }) {
     setFormData({ ...formData, correct: e.target.value });
   };
 
+  const handleCourseChange = (e) => {
+      setFormData({ ...formData, course_id: e.target.value });
+  };  //  ❤️❤️❤️❤️❤️
+
   // 3. Updated Handle Submit (Strict Validation)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,19 +94,36 @@ export default function EditQuestionPage({ isNew }) {
         alert("Please select which option is the correct answer.");
         return;
     }
+    if(!formData.course_id) {
+        alert("Please select a course for this question.");
+        return;
+    }      //  ❤️❤️❤️❤️❤️
     // ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
     const dataToSend = {
         text: formData.text, 
         options: cleanOptions, 
         correct_index: formData.correct, 
+        course_id: formData.course_id,    //  ❤️❤️❤️❤️❤️
         question_type: 'MCQ',
         unit: 1, 
         marks: 1, 
     };
 
     try {
-        const response = await addQuestion(dataToSend); 
-        alert("Question saved successfully!");
+        if (isNew) {
+            await addQuestion(dataToSend); 
+            alert("Question saved successfully!");
+            navigate('/professor/questions'); // Redirect after save
+        } else {
+            // Call update API and include course_id so mapping is updated
+            const res = await updateQuestion(questionId, dataToSend);
+            if (res && res.status === 200) {
+                alert('Question updated successfully!');
+                navigate('/professor/questions');
+            } else {
+                alert('Failed to update question.');
+            }
+        }    //  ❤️❤️❤️❤️❤️
     } catch (error) {
         console.error("Failed to add question:", error.response ? error.response.data : error.message);
         alert("Error saving question. Please try again.");
@@ -101,6 +141,32 @@ export default function EditQuestionPage({ isNew }) {
             {isNew ? 'Add New Question' : 'Edit Question'}
           </h2>
 
+          {/* ✅ 1. COURSE SELECTION DROPDOWN   ❤️❤️❤️❤️*/}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Select Course
+            </label>
+            <select
+              value={formData.course_id}
+              onChange={handleCourseChange}
+              required
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '5px',
+                border: '1px solid #ccc',
+                backgroundColor: '#fff'
+              }}
+            >
+              <option value="">-- Choose a Course --</option>
+              {courses.map(course => (
+                  <option key={course.id} value={course.id}>
+                      {course.course_name}
+                  </option>
+              ))}
+            </select>
+          </div>       
+
           {/* Question Text */}
           <FormInput 
             label="Question Text" 
@@ -112,7 +178,7 @@ export default function EditQuestionPage({ isNew }) {
 
           <h4 style={{marginTop: '20px', marginBottom: '10px'}}>Options</h4>
           
-          {/* Loop to create 4 Input Boxes */}
+          {/* Options Input Fields */}
           {formData.options.map((option, index) => (
             <FormInput
               key={index}
@@ -124,7 +190,7 @@ export default function EditQuestionPage({ isNew }) {
             />
           ))}
 
-          {/* Dropdown */}
+          {/* Correct Answer Dropdown */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
               Correct Answer

@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  fetchSchools, fetchPrograms, fetchDepartments, fetchCourses, 
-  fetchQuestionsByCourse, deleteQuestion 
-} from '../api/apiService'; 
+import Dropdown from '../components/layout/Dropdown';
 import Button from '../components/forms/Button'; 
 import { Link } from 'react-router-dom';
+import { 
+  fetchSchools, 
+  fetchPrograms, 
+  fetchDepartments, 
+  fetchCourses, 
+  fetchQuestionsByCourse, 
+  deleteQuestion,       
+  // fetchQuestions,
+} from '../api/apiService'; 
 
 export default function ViewQuestionsPage() {
   const navigate = useNavigate();
@@ -72,29 +78,64 @@ export default function ViewQuestionsPage() {
     }
   };
 
-  const handleCourseChange = async (e) => {
-    const courseId = e.target.value;
-    setSelections({ ...selections, course: courseId });
-    
-    if (courseId) {
-      setLoading(true);
-      try {
-        const res = await fetchQuestionsByCourse(courseId);
-        // Handle both array and dict formats
-        const data = Array.isArray(res.data) ? res.data : (res.data.questions || []);
-        setQuestions(data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    } else {
+const handleCourseChange = async (e) => {
+  const courseId = e.target.value;
+  setSelections({ ...selections, course: courseId });
+  
+  if (courseId) {
+    setLoading(true);
+    try {
+      const res = await fetchQuestionsByCourse(courseId);
+      
+      console.log("API Response Status:", res.status);
+      console.log("API Response Data:", res.data);
+      
+      let data = res.data; 
+      
+      // If the data is an object (dictionary with ID keys), convert it to an array of values
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+          data = Object.values(data);
+      }
+      
+      setQuestions(data || []);
+
+    } catch (err) { 
+      console.error("Error fetching questions by course:", err); 
       setQuestions([]);
     }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this question?")) {
-      await deleteQuestion(id);
-      setQuestions(questions.filter(q => q.id !== id));
+    finally { 
+      setLoading(false); 
     }
+  } else {
+    setQuestions([]);
+  }
+};
+
+const handleDelete = async (question_id) => {
+  if (!window.confirm("Delete this question?")) return;
+  if (!window.confirm("Are you sure you want to delete this question?")) return;
+
+  try {
+    console.log("Deleting question with ID:", question_id);
+
+    await deleteQuestion(question_id);
+
+    setQuestions(prev =>
+      prev.filter(q => q.question_id !== question_id)
+    );
+
+  } catch (error) {
+    console.error("Delete failed:", error.response || error.message);
+    alert("Failed to delete question");
+  }
+};
+
+  const filterHandlers = {
+    handleSchoolChange,
+    handleDeptChange,
+    handleProgramChange,
+    handleSemesterChange,
+    handleCourseChange
   };
 
   return (
@@ -110,56 +151,12 @@ export default function ViewQuestionsPage() {
       </div>
 
       {/* --- FILTER CARD (UPDATED LAYOUT) --- */}
-      <div style={styles.filterCard}>
-        <h3 style={{marginBottom: '20px', color: '#444'}}></h3>
-        
-        {/* ✅ GRID LAYOUT START */}
-        <div style={styles.gridContainer}>
-            
-            {/* Row 1: School & Department */}
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select School:</label>
-                <select style={styles.select} value={selections.school} onChange={handleSchoolChange}>
-                    <option value="">Select a school</option>
-                    {lists.schools.map(item => <option key={item.id} value={item.id}>{item.school_name}</option>)}
-                </select>
-            </div>
-
-            <div style={styles.inputGroup}>
-                 <label style={styles.label}>Select Department:</label>
-                 <select style={styles.select} value={selections.department} onChange={handleDeptChange} disabled={!selections.program}>
-                    <option value="">Select a department</option>
-                    {lists.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-            </div>
-
-            {/* Row 2: Program & Semester */}
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select Program:</label>
-                <select style={styles.select} value={selections.program} onChange={handleProgramChange} disabled={!selections.school}>
-                    <option value="">Select a program</option>
-                    {lists.programs.map(item => <option key={item.id} value={item.id}>{item.program_name}</option>)}
-                </select>
-            </div>
-
-            <div style={styles.inputGroup}>
-                <label style={styles.label}>Select Semester:</label>
-                <select style={styles.select} value={selections.semester} onChange={handleSemesterChange} disabled={!selections.department}>
-                    <option value="">Select a semester</option>
-                    {lists.semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
-                </select>
-            </div>
-
-            {/* Row 3: Course (Full Width) */}
-            <div style={{...styles.inputGroup, gridColumn: '1 / -1'}}>
-                <label style={styles.label}>Select Course:</label>
-                <select style={styles.select} value={selections.course} onChange={handleCourseChange} disabled={!selections.semester}>
-                    <option value="">Select a course</option>
-                    {lists.courses.map(item => <option key={item.id} value={item.id}>{item.course_name}</option>)}
-                </select>
-            </div>
-
-        </div>
+        <div className="page-container">
+          <Dropdown
+            lists={lists} 
+            selections={selections} 
+            handlers={filterHandlers}
+          />
         {/* ✅ GRID LAYOUT END */}
       </div>
 
@@ -182,9 +179,9 @@ export default function ViewQuestionsPage() {
           <tbody>
             {questions.length > 0 ? (
               questions.map((q) => (
-                <tr key={q.id} style={styles.tableRow}>
-                  <td style={styles.td}>{q.id}</td>
-                  <td style={styles.td}>{q.text}</td>
+                <tr key={q.question_id} style={styles.tableRow}>
+                  <td style={styles.td}>{q.question_id}</td>
+                  <td style={styles.td}>{q.question_txt}</td>
                   <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
                   <td style={styles.td}>{q.options?.[1]?.option_text || '-'}</td>
                   <td style={styles.td}>{q.options?.[2]?.option_text || '-'}</td>
@@ -194,8 +191,8 @@ export default function ViewQuestionsPage() {
                   </td>
                   <td style={styles.td}>
                     <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={() => navigate(`/professor/questions/edit/${q.id}`)} style={styles.editBtn}>Edit</button>
-                        <button onClick={() => handleDelete(q.id)} style={styles.deleteBtn}>Del</button>
+                        <button onClick={() => navigate(`/professor/questions/edit/${q.question_id}`)} style={styles.editBtn}>Edit</button>
+                        <button onClick={() => handleDelete(q.question_id)} style={styles.deleteBtn}>Del</button>
                     </div>
                   </td>
                 </tr>
@@ -215,58 +212,20 @@ export default function ViewQuestionsPage() {
   );
 }
 
-// --- UPDATED STYLES ---
 const styles = {
+  // Add these new styles
   mainContainer: {
-    padding: '30px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    boxSizing: 'border-box'
+    padding: '2rem 3rem',
+    width: '100%'
   },
-  headerRow: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: '25px' 
+  headerRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: '2rem'
   },
   
-  // FILTER CARD STYLES
-  filterCard: {
-    backgroundColor: '#fff',
-    padding: '30px',
-    borderRadius: '12px',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
-    marginBottom: '30px',
-    width: '100%',
-    boxSizing: 'border-box'
-  },
-  gridContainer: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr', // 2 Columns
-    gap: '20px', 
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  },
-  label: {
-    fontWeight: '600',
-    color: '#555',
-    fontSize: '0.9rem',
-    marginLeft: '2px'
-  },
-  select: {
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #e0e0e0',
-    fontSize: '1rem',
-    backgroundColor: '#f9f9f9',
-    width: '100%',
-    outline: 'none',
-    cursor: 'pointer'
-  },
-
   // TABLE STYLES
   tableCard: {
     backgroundColor: '#fff',
