@@ -161,6 +161,17 @@ export default function AuthPage() {
     </div>
   );
 }
+//above code is the previous one
+
+//priyanka
+
+//priyanka
+
+
+
+
+
+//commented code-----
 // import React, { useState } from 'react';
 // import { useNavigate } from 'react-router-dom';
 
@@ -331,3 +342,4 @@ export default function AuthPage() {
 //     </div>
 //   );
 // }
+//commented code-----

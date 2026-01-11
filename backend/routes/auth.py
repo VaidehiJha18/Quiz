@@ -50,7 +50,8 @@ def login():
         session['logged_in'] = True
         session['id'] = user_id
         session['role'] = getattr(user, 'role', 'student')
-                
+
+        #priyanka       
         return jsonify({
             "message": "Login successful",
             "user": {
@@ -58,7 +59,7 @@ def login():
                 "name": user.username,
                 "role": session['role']
             }
-        }), 200
+        }), 200 #🍜🍜🍜
     else:
         return jsonify({"message": "Invalid credentials"}), 401
 
@@ -87,3 +88,63 @@ def get_profile():
             return jsonify({"message": "User not found"}), 404
     else:
         return jsonify({"message": "Unauthorized"}), 401
+
+#priyanka
+# from flask import Blueprint, request, jsonify
+# from ..extensions import mysql
+# import bcrypt
+# from flask_cors import cross_origin 
+
+# auth_bp = Blueprint('auth', __name__)
+
+# @auth_bp.route('/login', methods=['POST'])
+# @cross_origin(supports_credentials=True)
+# def login():
+#     data = request.get_json()
+#     email = data.get('email')
+#     password = data.get('password')
+
+#     cur = mysql.connection.cursor()
+#     # Ensure you are selecting the role column!
+#     # Adjust column indices based on your actual database table
+#     # This query assumes columns: id, name, email, password, role
+#     cur.execute("SELECT id, name, email, password, role FROM users WHERE email = %s", (email,))
+#     user = cur.fetchone()
+#     cur.close()
+
+#     if user and bcrypt.checkpw(password.encode('utf-8'), user[3].encode('utf-8')):
+#         return jsonify({
+#             "message": "Login successful",
+#             "user_id": user[0],
+#             "name": user[1],
+#             "role": user[4]  # ✅ This sends 'student' or 'professor' to the frontend
+#         }), 200
+#     else:
+#         return jsonify({"message": "Invalid email or password"}), 401
+
+# @auth_bp.route('/signup', methods=['POST'])  # Changed from /register to match your frontend
+# @cross_origin(supports_credentials=True)
+# def signup():
+#     data = request.get_json()
+#     name = data.get('name')
+#     email = data.get('email')
+#     password = data.get('password')
+#     role = data.get('role', 'student') # Default to student if not provided
+
+#     # Basic Validation
+#     if not name or not email or not password:
+#         return jsonify({"message": "All fields are required"}), 400
+
+#     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+#     try:
+#         cur = mysql.connection.cursor()
+#         cur.execute("INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)", 
+#                     (name, email, hashed_password, role))
+#         mysql.connection.commit()
+#         cur.close()
+#         return jsonify({"message": "User registered successfully"}), 201
+#     except Exception as e:
+#         return jsonify({"message": "Email already exists or error occurred"}), 409
+    
+#     #priyanka

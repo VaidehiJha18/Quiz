@@ -1,66 +1,27 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import './App.css';
+// import React from 'react';
+// import { Routes, Route } from 'react-router-dom';
+// import './App.css';
 
-// --- Components ---
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage'; 
-import SignupPage from './pages/SignupPage';
-import ProfessorDashboard from './pages/ProfessorDashboard';
-import StudentDashboard from './pages/StudentDashboard';
-import QuizPage from './pages/QuizPage';
-import ViewQuizzesPage from './pages/ViewQuizzesPage';
-import ViewQuestionsPage from './pages/ViewQuestionsPage';
-import EditQuestionsPage from './pages/EditQuestionsPage';
-import ResultsPage from './pages/ResultsPage';
-import Quiz from './pages/Quiz';
-import GenerateQuizPage from './pages/GenerateQuizPage';
-import QuizPreviewPage from './pages/QuizPreviewPage';
+// // --- Components ---
+// import HomePage from './pages/HomePage';
+// import LoginPage from './pages/LoginPage'; 
+// import SignupPage from './pages/SignupPage';
+// import ProfessorDashboard from './pages/ProfessorDashboard';
+// import StudentDashboard from './pages/StudentDashboard';
+// import QuizPage from './pages/QuizPage';
+// import ViewQuizzesPage from './pages/ViewQuizzesPage';
+// import ViewQuestionsPage from './pages/ViewQuestionsPage';
+// import EditQuestionsPage from './pages/EditQuestionsPage';
+// import ResultsPage from './pages/ResultsPage';
+// import Quiz from './pages/Quiz';
+// import GenerateQuizPage from './pages/GenerateQuizPage';
+// import QuizPreviewPage from './pages/QuizPreviewPage';
 
-// ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
-import ProfessorLayout from './components/layout/ProfessorLayout';
-
-function App() {
-  // return <StudentDashboard />;
-  return (
-    <div className="App">
-      <Routes>
-        {/* --- Public & Student Routes (remain the same) --- */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-
-        {/* Student Routes */}
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/quiz/:quizId" element={<QuizPage />} />
-        <Route path="/student/results" element={<ResultsPage role="student" />} />
-
-        <Route path="/take-quiz/:token" element={<QuizPreviewPage />} />
-         
-        {/* --- Professor Routes (Now wrapped in the new layout) --- */}
-        {/* ✅ 2. WRAP all professor pages inside the ProfessorLayout route */}
-        <Route path="/professor" element={<ProfessorLayout />}>
-          <Route path="dashboard" element={<ProfessorDashboard />} />
-          <Route path="quizzes" element={<ViewQuizzesPage />} />
-          <Route path="questions" element={<ViewQuestionsPage />} />
-
-          <Route path="questions/add" element={<EditQuestionsPage isNew />} />
-          <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
-          <Route path="results" element={<ResultsPage role="professor" />} />      
-          <Route path="generate-quiz" element={<GenerateQuizPage />} />
-          
-          {/* You will need to create components for these new pages */}
-          <Route path="students" element={<h1>Manage Students Page</h1>} />
-          <Route path="analytics" element={<h1>Analytics Page</h1>} />
-        </Route>
-
-        <Route path="*" element={<h1>404: Page Not Found</h1>} />
-      </Routes>
-    </div>
-  );
-}
+// // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
+// import ProfessorLayout from './components/layout/ProfessorLayout';
 
 // function App() {
+//   // return <StudentDashboard />;
 //   return (
 //     <div className="App">
 //       <Routes>
@@ -68,22 +29,26 @@ function App() {
 //         <Route path="/" element={<HomePage />} />
 //         <Route path="/login" element={<LoginPage />} />
 //         <Route path="/signup" element={<SignupPage />} />
+
+//         {/* Student Routes */}
 //         <Route path="/student/dashboard" element={<StudentDashboard />} />
 //         <Route path="/quiz/:quizId" element={<QuizPage />} />
 //         <Route path="/student/results" element={<ResultsPage role="student" />} />
 
+//         <Route path="/take-quiz/:token" element={<QuizPreviewPage />} />
+         
 //         {/* --- Professor Routes (Now wrapped in the new layout) --- */}
 //         {/* ✅ 2. WRAP all professor pages inside the ProfessorLayout route */}
 //         <Route path="/professor" element={<ProfessorLayout />}>
 //           <Route path="dashboard" element={<ProfessorDashboard />} />
 //           <Route path="quizzes" element={<ViewQuizzesPage />} />
 //           <Route path="questions" element={<ViewQuestionsPage />} />
+
 //           <Route path="questions/add" element={<EditQuestionsPage isNew />} />
 //           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
-//           <Route path="results" element={<ResultsPage role="professor" />} />
-
-//           <Route path="generate-quiz" element={<h1>Generate Quiz Page</h1>} />
-
+//           <Route path="results" element={<ResultsPage role="professor" />} />      
+//           <Route path="generate-quiz" element={<GenerateQuizPage />} />
+          
 //           {/* You will need to create components for these new pages */}
 //           <Route path="students" element={<h1>Manage Students Page</h1>} />
 //           <Route path="analytics" element={<h1>Analytics Page</h1>} />
@@ -95,4 +60,62 @@ function App() {
 //   );
 // }
 
+// export default App;
+
+//priyanka
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import './App.css';
+
+// --- Components ---
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage'; 
+import SignupPage from './pages/SignupPage';
+import ProfessorDashboard from './pages/ProfessorDashboard';
+import StudentDashboard from './pages/StudentDashboard'; // ✅ New Import🍜🍜🍜
+import QuizPage from './pages/QuizPage';
+import ViewQuizzesPage from './pages/ViewQuizzesPage';
+import ViewQuestionsPage from './pages/ViewQuestionsPage';
+import EditQuestionsPage from './pages/EditQuestionsPage';
+import ResultsPage from './pages/ResultsPage';
+import GenerateQuizPage from './pages/GenerateQuizPage';
+
+import ProfessorLayout from './components/layout/ProfessorLayout';
+
+function App() {
+  return (
+    <div className="App">
+      <Routes>
+        {/* --- Public Routes --- */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+
+        {/* --- Student Routes --- */}
+        {/* ✅ This connects to the new Student Dashboard Page */}
+        <Route path="/student/dashboard" element={<StudentDashboard />} /> 
+        <Route path="/student/quizzes" element={<StudentDashboard />} /> {/* Placeholder */}
+        <Route path="/student/results" element={<ResultsPage role="student" />} />
+        <Route path="/quiz/:quizId" element={<QuizPage />} />
+
+        {/* --- Professor Routes --- */}
+        <Route path="/professor" element={<ProfessorLayout />}>
+          <Route path="dashboard" element={<ProfessorDashboard />} />
+          <Route path="quizzes" element={<ViewQuizzesPage />} />
+          <Route path="questions" element={<ViewQuestionsPage />} />
+          <Route path="questions/add" element={<EditQuestionsPage isNew />} />
+          <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
+          <Route path="results" element={<ResultsPage role="professor" />} />
+          <Route path="generate-quiz" element={<GenerateQuizPage />} />
+          <Route path="students" element={<h1>Manage Students Page</h1>} />
+          <Route path="analytics" element={<h1>Analytics Page</h1>} />
+        </Route>
+
+        <Route path="*" element={<h1>404: Page Not Found</h1>} />
+      </Routes>
+    </div>
+  );
+}
+
 export default App;
+//priyanka
