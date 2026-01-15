@@ -51,6 +51,7 @@ def login():
         session['id'] = user_id
         session['role'] = getattr(user, 'role', 'student')
                 
+        #priyanka       
         return jsonify({
             "message": "Login successful",
             "user": {
@@ -58,7 +59,7 @@ def login():
                 "name": user.username,
                 "role": session['role']
             }
-        }), 200
+        }), 200 #🍜🍜🍜
     else:
         return jsonify({"message": "Invalid credentials"}), 401
 

@@ -12,13 +12,13 @@ const FormInput = ({ label, type, name, value, onChange, placeholder, icon }) =>
         <input id={name} type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} required />
     </div>
 );
-//prii
+//priyanka
 const MessageDisplay = ({ message, type }) => {
     if (!message) return null;
     // ✅ FIX: Added backticks (`) inside the curly braces
     return <div className={`message-display ${type}`}>{message}</div>;
 };
-//prii
+//🍜🍜🍜
 // --- Main LoginPage Component ---
 export default function LoginPage() {
     const navigate = useNavigate();
@@ -36,16 +36,35 @@ export default function LoginPage() {
             // ✅ Use apiService instead of fetch
             const response = await loginUser(formData);
 
-            if (response.status === 200) {
-                setMessage({ type: 'success', text: "Login successful! Redirecting..." });
-                setTimeout(() => {
-                    if (response.data.user?.role === 'professor') {
-                        navigate('/professor/dashboard');
-                    } else {
-                        navigate('/student/dashboard');
-                    }
-                }, 1500);
-            }
+        //priyanka
+        if (response.status === 200) {
+    setMessage({ type: 'success', text: "Login successful! Redirecting..." });
+    
+    const data = response.data;
+    
+    // ✅ ROBUST CHECK: Look for role in both possible locations
+    // 1. Check if it's directly in data (e.g., data.role)
+    // 2. Check if it's nested in a user object (e.g., data.user.role)
+    const userRole = data.role || data.user?.role;
+
+    console.log("LOGIN DEBUG:", { roleFound: userRole, rawData: data }); // Check your console!
+
+    localStorage.setItem('userRole', userRole);
+
+    setTimeout(() => {
+        if (userRole === 'professor') {
+            navigate('/professor/dashboard');
+        } else if (userRole === 'student') {
+            navigate('/student/dashboard');
+        } else {
+            console.error("Role mismatch or undefined:", userRole);
+            // Optional: Show error to user instead of silent fail
+            setMessage({ type: 'error', text: "Login successful, but role unknown." });
+        }
+    }, 1500);
+} else {
+                 setMessage({ type: 'error', text: response.data?.message || "Invalid credentials." });
+            } //🍜🍜🍜
         } catch (err) {
             console.error("Login error:", err);
             const errorMessage = err.response?.data?.message || "Invalid credentials. Try again.";
