@@ -8,6 +8,7 @@ import uuid
 import random
 from wtforms import StringField, SelectField, SubmitField
 from wtforms.validators import DataRequired 
+import os
 
 # 1. Fetch Teacher's Courses
 def get_courses_for_teacher(teacher_id):
@@ -373,7 +374,8 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name):
         count = len(selected_questions)
 
         quiz_token = str(uuid.uuid4())[:12]
-        quiz_link = f"http://localhost:3000/take-quiz/{quiz_token}"
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+        quiz_link = f"{frontend_url}/take-quiz/{quiz_token}"
         
         insert_quiz = """
             INSERT INTO quizzes (
