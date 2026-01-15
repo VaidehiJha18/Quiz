@@ -116,8 +116,9 @@ class AuthService:
 
             # 2. Map role_id to role name
             role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
-            db_role_id = user_record.pop('role_id')
+            db_role_id = int(user_record.pop('role_id'))
             role_name = role_name_map.get(db_role_id, 'unknown')
+            print(f"DEBUG: User {email} has role_id: {db_role_id} -> Role: {role_name}")
             user_record['role'] = role_name
             user_record['username'] = user_record.pop('user_name')
             user_record['password_hash'] = stored_hash
@@ -145,7 +146,7 @@ class AuthService:
                 return None
 
             stored_hash = user_record.pop('password_hash')
-            db_role_id = user_record.pop('role_id')
+            db_role_id = int(user_record.pop('role_id'))
             role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
 
             user_record['role'] = role_name_map.get(db_role_id, 'unknown')
