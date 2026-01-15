@@ -15,8 +15,11 @@ class AuthService:
         self.ph = PasswordHasher()
         # Email regex patterns
         self.ADMIN_EMAIL_PATTERN = r'^(admin-\d+|[a-zA-Z0-9.]+admin)@gsfcuniversity\.ac\.in$'
-        self.PROFESSOR_EMAIL_PATTERN = r'^[a-zA-Z0-9.]+@gsfcuniversity\.ac\.in$'
-        self.STUDENT_EMAIL_PATTERN = r'^\d+@gsfcuniversity\.ac\.in$'
+        # self.PROFESSOR_EMAIL_PATTERN = r'^[a-zA-Z0-9.]+@gsfcuniversity\.ac\.in$'
+        # self.STUDENT_EMAIL_PATTERN = r'^\d+@gsfcuniversity\.ac\.in$'
+        #priyanka
+        self.PROFESSOR_EMAIL_PATTERN = r'^[a-zA-Z][a-zA-Z0-9.]*@gsfcuniversity\.ac\.in$'#🍜🍜🍜
+        self.STUDENT_EMAIL_PATTERN = r'^[a-zA-Z0-9.]+@gsfcuniversity\.ac\.in$'#🍜🍜🍜
 
     # Determine role based on email
     def _determine_role(self, email):
