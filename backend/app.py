@@ -29,7 +29,7 @@ def create_app(config_class=Config):
     print("=" * 50)
     app.config.update(
         SESSION_COOKIE_SECURE = False,
-        SESSION_COOKIE_SAMESITE = 'Lax',
+        SESSION_COOKIE_SAMESITE = 'None',
         SESSION_COOKIE_HTTPONLY = True,
         SESSION_PERMANENT = False,
         SESSION_COOKIE_NAME = 'quiz_portal_session_new',

@@ -19,7 +19,17 @@ def professor_required(f):
         if request.method == "OPTIONS":
             return '', 200
 
-        if session.get('role') != 'professor':
+        # 🔍 DEBUG: Print what is actually in the session
+        current_role = session.get('role')
+        user_id = session.get('id')
+        print(f"DEBUG: Access Check -> User ID: {user_id} | Session Role: '{current_role}'")
+
+        # ✅ Allow multiple valid formats for "Professor"
+        # 2 = Database ID, 'professor' = Lowercase, 'Professor' = Title case
+        valid_roles = ['professor', 'Professor', 2, '2']
+
+        if current_role not in valid_roles:
+            print(f"❌ DENIED: Role '{current_role}' is not in valid list {valid_roles}")
             return jsonify({"message": "Unauthorized"}), 403
 
         return f(*args, **kwargs)
