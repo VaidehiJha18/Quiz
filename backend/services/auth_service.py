@@ -149,6 +149,8 @@ class AuthService:
             db_role_id = int(user_record.pop('role_id'))
             role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
 
+            print(f"DEBUG: Session Load - User ID: {user_id}, DB Role ID: {db_role_id} -> Mapped Role: {role_name}")
+            
             user_record['role'] = role_name_map.get(db_role_id, 'unknown')
             user_record['username'] = user_record.pop('user_name')
             user_record['password_hash'] = stored_hash
