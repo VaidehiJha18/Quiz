@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchQuizzes } from '../api/apiService';
+import { fetchQuizzes, deleteQuiz } from '../api/apiService';
 
 export default function ViewQuizzesPage() {
   const [quizzes, setQuizzes] = useState([]);
@@ -22,7 +22,7 @@ export default function ViewQuizzesPage() {
       setError('Failed to load quizzes. Please try again.');
     } finally {
       setLoading(false);
-    }
+   }
   };
 
   const handleDelete = async (quizId) => {
@@ -31,28 +31,25 @@ export default function ViewQuizzesPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/prof/quizzes/${quizId}`, { 
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
-        alert('Quiz deleted successfully!');
-      } else {
-        setQuizzes(quizzes.filter(quiz => quiz.id !== quizId)); 
-        alert('Quiz removed from list.');
-      }
+      // ✅ Use the API service instead of hardcoded fetch
+      await deleteQuiz(quizId);
+      
+      // Update UI
+      setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
+      alert('Quiz deleted successfully!');
+      
     } catch (err) {
       console.error('Error deleting quiz:', err);
-      alert('Error deleting quiz');
+      alert('Failed to delete quiz. Please try again.');
     }
   };
 
   const handleReviewEdit = (token) => {
-    window.location.href = `/quiz-preview/${token}`;
+    if (!token) {
+        alert("Error: This quiz has no token.");
+        return;
+    }
+    window.location.href = `/take-quiz/${token}`;
   };
 
   const formatDate = (dateString) => {
@@ -107,7 +104,13 @@ export default function ViewQuizzesPage() {
                 <thead>
                   <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '2px solid #e5e7eb' }}>
                     <th style={headerStyle}>Quiz Title</th>
-                    <th style={headerStyle}>Course ID</th>
+                    <th style={headerStyle}>Teacher</th>
+                    <th style={headerStyle}>School</th>
+                    <th style={headerStyle}>Department</th>
+                    <th style={headerStyle}>Program</th>
+                    <th style={headerStyle}>Semester</th>
+                    <th style={headerStyle}>Course</th>
+                    <th style={headerStyle}>Qs</th>
                     <th style={headerStyle}>Status</th>
                     <th style={headerStyle}>Quiz Link</th>
                     <th style={headerStyle}>Generated On</th>
@@ -117,8 +120,16 @@ export default function ViewQuizzesPage() {
                 <tbody>
                   {quizzes.map((quiz, index) => (
                     <tr key={quiz.id} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={cellStyle}>{quiz.quiz_title || 'Untitled'}</td>
-                      <td style={cellStyle}>{quiz.course_id}</td>
+                      <td style={cellStyle}>{quiz.quiz_title || quiz.title || 'Untitled'}</td>
+                      <td style={cellStyle}>{quiz.teacher || '-'}</td>
+                      <td style={cellStyle}>{quiz.school || '-'}</td>
+                      <td style={cellStyle}>{quiz.department || '-'}</td>
+                      <td style={cellStyle}>{quiz.program || '-'}</td>
+                      <td style={cellStyle}>{quiz.semester || '-'}</td>
+                      <td style={cellStyle}>{quiz.course || quiz.course_id || '-'}</td>
+                      <td style={{ ...cellStyle, textAlign: 'center' }}>
+                         {quiz.total_questions || quiz.totalQuestions || 0}
+                      </td>
                       <td style={cellStyle}>
                         <span style={{
                           padding: '4px 12px',
@@ -132,7 +143,6 @@ export default function ViewQuizzesPage() {
                         </span>
                       </td>
                       <td style={cellStyle}>
-                        {/* 🚀 FIX: Link directly to the correct internal route using the TOKEN */}
                         <a 
                           href={`/take-quiz/${quiz.token}`}
                           target="_blank"
@@ -188,5 +198,5 @@ export default function ViewQuizzesPage() {
 }
 
 // Styles
-const headerStyle = { padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#374151' };
+const headerStyle = { padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#374151', position: 'sticky', top: 0, backgroundColor: '#f3f4f6', zIndex: 10, boxShadow: '0 2px 2px -1px rgba(0, 0, 0, 0.1)' };
 const cellStyle = { padding: '12px 16px', fontSize: '13px', color: '#4b5563' };

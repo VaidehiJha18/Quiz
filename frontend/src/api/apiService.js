@@ -54,3 +54,12 @@ export const fetchTeacherCourses = () => api.get('/prof/my-courses');
 
 // 9. Course stats (useful for debugging why generation fails)
 export const fetchCourseStats = (courseId) => api.get(`/prof/course-stats?course_id=${courseId}`);
+
+//  10. Fetch available divisions for a course (For Publish Modal)
+export const fetchDivisions = (courseId) => api.get(`/prof/divisions?course_id=${courseId}`);
+
+// 11. Publish Quiz (Updates status to 'Published')
+export const publishQuiz = (quizId, data) => api.post(`/prof/quizzes/${quizId}/publish`, data);
+
+// 12. Delete Quiz
+export const deleteQuiz = (quizId) => api.delete(`/prof/quizzes/${quizId}`);
