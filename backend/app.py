@@ -28,8 +28,8 @@ def create_app(config_class=Config):
     print(f"DB_PORT: {app.config.get('DB_PORT')}")
     print("=" * 50)
     app.config.update(
-        SESSION_COOKIE_SECURE = False,   # True for render
-        SESSION_COOKIE_SAMESITE = 'Lax',  # 'None' for render
+        SESSION_COOKIE_SECURE = True,   # True for render  & False for localhost
+        SESSION_COOKIE_SAMESITE = 'None',  # 'None' for render    & 'Lax' for localhost
         SESSION_COOKIE_HTTPONLY = True,
         SESSION_PERMANENT = False,
         SESSION_COOKIE_NAME = 'quiz_portal_session_new',
