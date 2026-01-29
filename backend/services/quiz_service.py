@@ -418,7 +418,7 @@ def get_professor_quizzes(teacher_id):
         sql = """
             SELECT 
                 id, quiz_title, teacher, school, department, program, 
-                semester, course, total_questions, 
+                semester, course, course_id, total_questions, 
                 quiz_status AS status, 
                 quiz_link, 
                 quiz_token AS token, 
@@ -572,7 +572,83 @@ def get_question_by_id(question_id):
     finally:
         cursor.close()
         conn.close()    
+
+#  Publishing Part ❤️❤️❤️❤️❤️
+
+# Add this new function to fetch divisions allowed for this teacher
+def get_divisions_for_publish(teacher_id, course_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # Fetch only divisions where the teacher is assigned to this course
+        sql = """
+            SELECT d.id, d.division 
+            FROM division d
+            JOIN teacher_course_division tcd ON d.id = tcd.division_id
+            WHERE tcd.teacher_id = %s AND tcd.course_id = %s
+            ORDER BY d.division ASC
+        """
+        cursor.execute(sql, (teacher_id, course_id))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching divisions: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+# Add this function to handle the Publish logic
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
+    """Updates quiz status and links it to specific divisions."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 1. Update Quiz Metadata (Time Limit & Status)
+        update_quiz_sql = """
+            UPDATE quizzes 
+            SET time_limit = %s, quiz_status = 'Published' 
+            WHERE id = %s
+        """
+        cursor.execute(update_quiz_sql, (time_limit, quiz_id))
+
+        # 2. Get Course and Semester info from the quiz to ensure consistency
+        get_ids_sql = """
+            SELECT q.course_id, sc.semester_id 
+            FROM quizzes q
+            JOIN semester_course sc ON q.course_id = sc.course_id
+            WHERE q.id = %s LIMIT 1
+        """
+        cursor.execute(get_ids_sql, (quiz_id,))
+        meta = cursor.fetchone() # returns tuple (course_id, semester_id)
         
+        if not meta:
+            raise Exception("Could not verify course/semester details.")
+            
+        course_id = meta['course_id']
+        semester_id = meta['semester_id']
+
+        # 3. Link Quiz to Selected Divisions
+        # Clear old links first to prevent duplicates
+        cursor.execute("DELETE FROM quiz_semester_course_division WHERE quiz_id = %s", (quiz_id,))
+
+        insert_div_sql = """
+            INSERT INTO quiz_semester_course_division 
+            (quiz_id, semester_id, course_id, division_id)
+            VALUES (%s, %s, %s, %s)
+        """
+        
+        for div_id in division_ids:
+            cursor.execute(insert_div_sql, (quiz_id, semester_id, course_id, div_id))
+
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Error publishing quiz: {type(e).__name__}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close() 
 
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
 # STUDENT SIDE

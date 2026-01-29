@@ -91,8 +91,11 @@ def get_programs():
 def fetch_departments_list_view(): 
     program_id_raw = request.args.get('program_id')
     print(f"DEBUG: Fetching departments for Program ID: {program_id_raw}")
+    
     if not program_id_raw:
+        print("[DEBUG] No Program ID provided. Returning empty list.")
         return jsonify([]), 200
+    
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -102,8 +105,19 @@ def fetch_departments_list_view():
             JOIN dept_program dp ON d.id = dp.dept_id
             WHERE dp.program_id = %s
         """
+        # DEBUG 2: Print the query we are about to run
+        prog_id = int(program_id_raw)
+        print(f"[DEBUG] 2. Executing SQL: SELECT ... WHERE dp.program_id = {prog_id}")
+
         cursor.execute(sql, (int(program_id_raw),))
         data = cursor.fetchall()
+
+        # DEBUG 3: Print EXACTLY what the database found
+        print(f"[DEBUG] 3. Database Results: {data}")
+
+        if not data:
+            print("[DEBUG] !!! The list is EMPTY. This means NO LINK exists in 'dept_program' table.")
+
         return jsonify(data), 200
     except Exception as e:
         print(f"!!! Error fetching departments: {e}")
@@ -398,144 +412,34 @@ def submit_quiz(quiz_id):
         print(f"Submit Quiz Error: {e}")
         return jsonify({"message": "Internal Server Error"}), 500
     
-
-
-
-#⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
-#⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
-
-# # 4. API to generate a quiz
-# @professor_bp.route('/generate', methods=['POST'])
-# @professor_required
-# def generate_quiz_api():
-#     try:
-#         teacher_id = session.get('id')
-#         data = request.get_json()
-#         course_id = data.get('course_id') # Get course from frontend selection
-
-#         if not teacher_id:
-#             return jsonify({"message": "User ID not found"}), 400
-        
-#         # Pass both teacher and course to the service
-#         quiz_data = quiz_service.generate_and_save_quiz(teacher_id, course_id)
-
-#         if not quiz_data:
-#             return jsonify({"message": "No questions found for this course."}), 404
-        
-#         return jsonify({
-#             "message": "Quiz generated and saved successfully.",
-#             "quiz_link": quiz_data['quiz_link'],
-#             "quiz_id": quiz_data['id']
-#         }), 201
-#     except Exception as e:
-#         return jsonify({"message": f"Quiz generation failed: {str(e)}"}), 500
+# 5. Publish quiz  ❤️❤️❤️❤️❤️
+@professor_bp.route('/divisions', methods=['GET'])
+@professor_required
+def get_divisions_api():
+    teacher_id = session.get('id')
+    course_id = request.args.get('course_id')
     
-# # 4. API to fetch quiz preview data ❤️❤️❤️❤️❤️
-# @professor_bp.route('/quiz-preview/<token>', methods=['GET'])
-# @professor_required
-# def get_quiz_preview_api(token):
-#     try:
-#         quiz_data = quiz_service.get_quiz_preview_details(token)
-        
-#         if not quiz_data:
-#             return jsonify({"message": "Quiz not found or invalid token"}), 404
-            
-#         return jsonify(quiz_data), 200
-#     except Exception as e:
-#         print(f"Preview Error: {e}")
-#         return jsonify({"message": "Internal Server Error"}), 500
-
-# # 5. API to fetch questions for quiz creation
-# @professor_bp.route('/questions', methods=['GET'])
-# @professor_required
-# def get_questions_api():
-#     try:
-#         employee_id = session.get('id')
-#         if not employee_id:
-#             return jsonify({"message": "User ID not found in session."}), 400
-
-#         questions = quiz_service.fetch_questions(employee_id, fetch_scope='creator')
-#         if questions is None:
-#             print("WARNING: quiz_service.fetch_questions returned None. Returning empty object {}")
-#             questions = {}
-            
-#         return jsonify(questions), 200
-#     except Exception as e:
-#         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
+    print(f"DEBUG: Fetching divisions for Teacher {teacher_id} and Course {course_id}")
     
-#     #adding my code
-#     # --- PASTE THIS AT THE BOTTOM OF routes/professor.py ---
-# # Vaidehi Changes
-# # 6. API to fetch/update a single question
-# @professor_bp.route('/questions/<int:id>', methods=['GET', 'PUT'])
-# @professor_required
-# def handle_single_question(id):
-#     """Handles fetching (GET) and updating (PUT) a single question."""
+    if not course_id:
+        return jsonify([]), 400
+
+    divisions = quiz_service.get_divisions_for_publish(teacher_id, course_id)
+    return jsonify(divisions), 200
+
+@professor_bp.route('/quizzes/<int:quiz_id>/publish', methods=['POST'])
+@professor_required
+def publish_quiz_api(quiz_id):
+    data = request.get_json()
+    time_limit = data.get('time_limit')
+    division_ids = data.get('division_ids') # Array of IDs, e.g., [1, 2]
+
+    if not time_limit or not division_ids:
+        return jsonify({"message": "Missing time limit or divisions"}), 400
+
+    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids)
     
-#     if request.method == 'GET':
-#         # --- Logic for Fetching (GET) ---
-#         try:
-           
-#             question_data = quiz_service.get_question_by_id(id) 
-            
-#             if not question_data:
-#                 return jsonify({'message': 'Question not found'}), 404
-                
-#             return jsonify(question_data), 200 
-
-#         except Exception as e:
-           
-#             print(f"!!! ERROR during GET for ID {id}: {e}") 
-#             return jsonify({'message': 'Internal Server Error during fetch.'}), 500
-
-#     elif request.method == 'PUT':
-#         # --- Logic for Updating (PUT) ---
-#         try:
-#             data = request.get_json()
-            
-#             updated_q = quiz_service.update_question(id, data) 
-            
-#             if not updated_q:
-#                 return jsonify({'message': 'Question not found or update failed'}), 404
-                
-#             return jsonify({'message': 'Question updated successfully', 'question': updated_q}), 200 # <-- CRITICAL: Return response status
-
-#         except Exception as e:
-           
-#             print(f"!!! ERROR during PUT for ID {id}: {e}")
-#             return jsonify({'message': 'Internal Server Error during update.'}), 500
-#     elif request.method == 'DELETE':
-#         # --- Logic for Deleting (DELETE) ---
-#         try:
-#             # Call the service layer to delete the question and related options
-#             success = quiz_service.delete_question(id) 
-            
-#             if not success:
-#                 return jsonify({'message': 'Question not found or deletion failed'}), 404
-                
-#             return jsonify({'message': 'Question deleted successfully'}), 200
-
-#         except Exception as e:
-#             print(f"!!! ERROR during DELETE for ID {id}: {e}")
-#             return jsonify({'message': 'Internal Server Error during deletion.'}), 500
-    
-#     return jsonify({'message': 'Method not allowed'}), 405
-    
-
-# from flask import request, jsonify
-
-# @professor_bp.route('/questions/by_course/<int:course_id>', methods=['GET'])
-# @professor_required
-# def get_questions_by_course_api(course_id):
-#     try:
-#         # Call the new service function
-#         questions_list = fetch_questions_by_course(course_id)
-        
-#         if not questions_list:
-#             return jsonify({"message": "No questions found for this course."}), 200
-            
-#         return jsonify(questions_list), 200
-#     except Exception as e:
-#         print(f"Error fetching questions by course: {e}")
-#         return jsonify({"message": "Internal server error fetching questions."}), 500
-# # vaidehi
+    if success:
+        return jsonify({"message": "Quiz published successfully!"}), 200
+    else:
+        return jsonify({"message": "Failed to publish quiz."}), 500

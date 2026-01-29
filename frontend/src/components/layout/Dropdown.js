@@ -39,7 +39,6 @@ const dropdownStyles = {
   },
 };
 
-// We don't need 'styles' in props anymore since it's internal
 const Dropdown = ({ lists, selections, handlers }) => {
   return (
     <div style={dropdownStyles.filterCard}>
@@ -62,6 +61,22 @@ const Dropdown = ({ lists, selections, handlers }) => {
           </select>
         </div>
 
+         {/* Row 2: Program */}
+        <div style={dropdownStyles.inputGroup}>
+          <label style={dropdownStyles.label}>Select Program:</label>
+          <select 
+            style={dropdownStyles.select} 
+            value={selections.program} 
+            onChange={handlers.handleProgramChange} 
+            disabled={!selections.school}
+          >
+            <option value="">Select a program</option>
+            {(lists.programs || []).map(item => (
+              <option key={item.id} value={item.id}>{item.program_name}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Row 1: Department */}
         <div style={dropdownStyles.inputGroup}>
           <label style={dropdownStyles.label}>Select Department:</label>
@@ -74,22 +89,6 @@ const Dropdown = ({ lists, selections, handlers }) => {
             <option value="">Select a department</option>
             {(lists.departments || []).map(item => (
               <option key={item.id} value={item.id}>{item.dept_name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Row 2: Program */}
-        <div style={dropdownStyles.inputGroup}>
-          <label style={dropdownStyles.label}>Select Program:</label>
-          <select 
-            style={dropdownStyles.select} 
-            value={selections.program} 
-            onChange={handlers.handleProgramChange} 
-            disabled={!selections.school}
-          >
-            <option value="">Select a program</option>
-            {(lists.programs || []).map(item => (
-              <option key={item.id} value={item.id}>{item.program_name}</option>
             ))}
           </select>
         </div>
