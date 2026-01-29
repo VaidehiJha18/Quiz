@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StudentSidebar from '../components/layout/StudentSidebar';
 import StudentQuizCard from '../components/quiz/StudentQuizCard';
+import { fetchStudentProfile, fetchStudentDashboard } from '../api/apiService';
 
 const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -353,76 +354,85 @@ if (typeof document !== 'undefined') {
 
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('available');
+  const [quizzes, setQuizzes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // ✅ NEW: State for Student Profile Data
+  const [studentData, setStudentData] = useState({
+    name: 'Loading...', 
+    id: '...'
+  });
 
-  const studentData = {
-    name: 'Sarah Johnson',
-    id: '2024CS001'
-  };
+  useEffect(() => {
+    // 1. Fetch Profile Data
+    const loadProfile = async () => {
+      try {
+        const res = await fetchStudentProfile(); 
+        // Safety check: ensure we actually got a name back
+        if (res.data && res.data.name) {
+             setStudentData(res.data);
+        } else if (res.data && res.data.f_name) {
+             // Handle case where DB column is f_name instead of name
+             setStudentData({ ...res.data, name: res.data.f_name });
+        }
+      } catch (err) {
+        console.error("Error loading profile:", err);
+        // Optional: Set a default name on error so it doesn't stay stuck on "Loading"
+        setStudentData({ name: "Student", id: "N/A" });
+      }
+    };
 
-  const availableQuizzes = [
-    {
-      id: 1,
-      title: 'Data Structures Midterm',
-      questions: 20,
-      duration: '30 minutes',
-      dueDate: 'March 15, 2024',
-      professor: 'Dr. Smith',
-      status: 'available'
-    },
-    {
-      id: 2,
-      title: 'Database Design Quiz',
-      questions: 15,
-      duration: '20 minutes',
-      dueDate: 'March 18, 2024',
-      professor: 'Dr. Johnson',
-      status: 'available'
-    },
-    {
-      id: 3,
-      title: 'Algorithm Analysis Final',
-      questions: 25,
-      duration: '45 minutes',
-      dueDate: 'March 25, 2024',
-      professor: 'Dr. Williams',
-      status: 'upcoming'
-    }
-  ];
+    // 2. Fetch Quizzes
+    const loadQuizzes = async () => {
+      try {
+        const res = await fetchStudentDashboard();
+        setQuizzes(res.data || []); 
+      } catch (err) {
+        console.error("Error loading quizzes:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleStartQuiz = (quizId) => {
-    alert(`Starting quiz ${quizId}... (In real app, this would navigate to the quiz page)`);
+    loadProfile();
+    loadQuizzes();
+  }, []);
+
+  const handleStartQuiz = (token) => {
+    window.open(`/take-quiz/${token}`, '_blank');
   };
 
   const renderContent = () => {
     switch(activeTab) {
       case 'available':
+        if (loading) return <div className="empty-state">Loading your quizzes...</div>;
+        if (quizzes.length === 0) return <div className="empty-state">No quizzes found for your semester.</div>;
+
         return (
           <div className="quiz-cards-container">
-            {availableQuizzes.map(quiz => (
-              <StudentQuizCard key={quiz.id} quiz={quiz} onStartQuiz={handleStartQuiz} />
+            {quizzes.map(quiz => (
+              <StudentQuizCard 
+                  key={quiz.id} 
+                  quiz={{
+                    id: quiz.id,
+                    title: quiz.quiz_title,
+                    questions: quiz.total_questions,
+                    duration: `${quiz.duration || 30} minutes`,
+                    professor: quiz.teacher,
+                    dueDate: quiz.created_at ? new Date(quiz.created_at).toLocaleDateString() : 'N/A',
+                    status: 'available',
+                    token: quiz.quiz_token 
+                  }} 
+                  onStartQuiz={() => handleStartQuiz(quiz.quiz_token)} 
+              />
             ))}
           </div>
         );
       case 'history':
-        return (
-          <div className="quiz-cards-container">
-            <div className="quiz-card">
-              <h3 className="quiz-card-title">Quiz History</h3>
-              <p style={{color: 'white', marginTop: '1rem'}}>Your completed quizzes will appear here.</p>
-            </div>
-          </div>
-        );
+        return <div className="quiz-cards-container"><div className="empty-state"><h3>Quiz History</h3><p>Your completed quizzes will appear here.</p></div></div>;
       case 'results':
-        return (
-          <div className="quiz-cards-container">
-            <div className="quiz-card">
-              <h3 className="quiz-card-title">My Results</h3>
-              <p style={{color: 'white', marginTop: '1rem'}}>Your quiz results and scores will appear here.</p>
-            </div>
-          </div>
-        );
-      default:
-        return null;
+        return <div className="quiz-cards-container"><div className="empty-state"><h3>My Results</h3><p>Your scores will appear here after grading.</p></div></div>;
+      default: return null;
     }
   };
 
@@ -439,8 +449,11 @@ const StudentDashboard = () => {
             </div>
             
             <div className="student-profile">
-              <div className="profile-avatar">S</div>
+              <div className="profile-avatar">
+                {studentData.name ? studentData.name.charAt(0) : 'S'}
+              </div>
               <div className="profile-info">
+                {/* ✅ Display Real Name from Database */}
                 <div className="profile-name">{studentData.name}</div>
                 <div className="profile-id">ID: {studentData.id}</div>
               </div>

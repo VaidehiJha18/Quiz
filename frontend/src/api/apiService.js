@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/';
 
-const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
+// const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -24,7 +24,6 @@ export const addQuestion = (data) => api.post('/prof/add_questions', data);
 export const deleteQuestion = (id) => api.delete(`/prof/delete_question/${id}`);
 export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
 export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);
-export const fetchQuizQuestions = (token) => api.get(`/prof/take-quiz/${token}`);
 
 // --- Dropdown API Calls (Add these to the bottom of apiService.js) ---
 
@@ -63,3 +62,20 @@ export const publishQuiz = (quizId, data) => api.post(`/prof/quizzes/${quizId}/p
 
 // 12. Delete Quiz
 export const deleteQuiz = (quizId) => api.delete(`/prof/quizzes/${quizId}`);
+
+// STUDENT ENDPOINTS
+
+// 13. Get Student Profile (Name, ID)
+export const fetchStudentProfile = () => api.get('/student/profile');
+
+// 14. Get Student Dashboard (My Quizzes)
+export const fetchStudentDashboard = () => api.get('/student/dashboard');
+
+// 15. Submit Quiz Answers
+export const submitStudentQuiz = (quizId, answers) => api.post(`/student/quiz/${quizId}/submit`, answers);
+
+// 16. Fetch Student Results (History)
+export const fetchStudentResults = () => api.get('/student/results');
+
+// 17. Fetch Quiz Questions for Taking Quiz
+export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token}`);
