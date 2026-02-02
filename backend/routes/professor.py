@@ -443,3 +443,23 @@ def publish_quiz_api(quiz_id):
         return jsonify({"message": "Quiz published successfully!"}), 200
     else:
         return jsonify({"message": "Failed to publish quiz."}), 500
+    
+@professor_bp.route('/quiz-results/<int:quiz_id>', methods=['GET'])
+@professor_required
+def view_results(quiz_id):
+    results = quiz_service.get_professor_results_table(quiz_id)
+    return jsonify(results), 200
+
+@professor_bp.route('/publish-results', methods=['POST'])
+@professor_required
+def publish_results_api():
+    data = request.get_json()
+    attempt_ids = data.get('attempt_ids') # List of attempt IDs to publish
+    
+    if not attempt_ids:
+        return jsonify({"message": "No attempts selected"}), 400
+        
+    success = quiz_service.publish_quiz_results(attempt_ids)
+    if success:
+        return jsonify({"message": "Results published to students!"}), 200
+    return jsonify({"message": "Failed to publish"}), 500

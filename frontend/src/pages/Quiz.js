@@ -1,35 +1,37 @@
-import QuizSidebar from '../components/quiz/QuizSidebar';
-import QuestionIndicator from '../components/quiz/QuestionIndicator';
-import QuizQCard from '../components/quiz/QuizQCard';
-import './Quiz.css';
-import { useParams } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
-import { fetchQuizQuestions } from '../api/apiService';
+import { useParams, useNavigate } from 'react-router-dom';
+import QuizSidebar from '../components/quiz/QuizSidebar';
+import QuizQCard from '../components/quiz/QuizQCard';
+import { fetchQuizQuestions, submitStudentQuiz } from '../api/apiService';
+import './Quiz.css';
 
 const Quiz = () => {
   const { token } = useParams();
+  const navigate = useNavigate();
+  
+  // --- State Management ---
   const [quizData, setQuizData] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // States that depend on question count
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState([]);
+  const [answers, setAnswers] = useState([]); // Array of option IDs
   const [reviewFlags, setReviewFlags] = useState([]);
   const [visitedQuestions, setVisitedQuestions] = useState(new Set([0]));
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- Fetch Quiz Data ---
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        // Pass the token directly to your service
         const response = await fetchQuizQuestions(token); 
-        const data = response.data; // Axios data
+        const data = response.data;
         
         setQuizData(data);
+        // Initialize state arrays based on question count
         setAnswers(Array(data.questions.length).fill(null));
         setReviewFlags(Array(data.questions.length).fill(false));
       } catch (err) {
         console.error("Failed to load quiz:", err);
-        setQuizData(null);
       } finally {
         setLoading(false);
       }
@@ -37,24 +39,30 @@ const Quiz = () => {
     fetchQuiz();
   }, [token]);
 
+  // --- Loading / Error States ---
   if (loading) return <div className="loading">Loading Quiz Questions...</div>;
   if (!quizData) return <div className="error">Quiz not found.</div>;
 
-  // Now we can safely use quizData.questions.length
+  // --- Derived Constants ---
   const totalQuestions = quizData.questions.length;
+  const answeredCount = answers.filter(a => a !== null).length;
+  const allAnswered = answeredCount === totalQuestions;
 
+  // --- Sidebar Logic ---
   const getQuestionStatus = (index) => {
     if (reviewFlags[index]) return 'review';
     if (answers[index] !== null) return 'answered';
-    if (visitedQuestions.has(index)) return 'unattempted';
+    if (index === currentQuestion) return 'active'; 
+    if (visitedQuestions.has(index)) return 'unattempted'; // Visited but not answered
     return 'unvisited';
   };
 
   const questionStatuses = quizData.questions.map((_, index) => getQuestionStatus(index));
 
+  // --- Handlers ---
   const handleAnswerSelect = (optionId) => {
     const newAnswers = [...answers];
-    newAnswers[currentQuestion] = optionId; // Store the ID from the database
+    newAnswers[currentQuestion] = optionId; 
     setAnswers(newAnswers);
   };
 
@@ -65,10 +73,10 @@ const Quiz = () => {
   };
 
   const handleNext = () => {
-    if (currentQuestion < quizData.questions.length - 1) {
+    if (currentQuestion < totalQuestions - 1) {
       const nextQuestion = currentQuestion + 1;
       setCurrentQuestion(nextQuestion);
-      setVisitedQuestions(prev => new Set([...prev, nextQuestion])); // Mark as visited
+      setVisitedQuestions(prev => new Set([...prev, nextQuestion]));
     }
   };
 
@@ -76,61 +84,65 @@ const Quiz = () => {
     if (currentQuestion > 0) {
       const prevQuestion = currentQuestion - 1;
       setCurrentQuestion(prevQuestion);
-      setVisitedQuestions(prev => new Set([...prev, prevQuestion])); // Mark as visited
+      setVisitedQuestions(prev => new Set([...prev, prevQuestion]));
     }
   };
 
   const handleSubmit = async () => {
-    const unanswered = answers.filter(a => a === null).length;
-    if (unanswered > 0 && !window.confirm(`You have ${unanswered} unanswered questions. Submit anyway?`)) {
-      return;
-    }
+    // Strict Check: Ensure all questions are answered
+    if (!allAnswered) return; 
+    
+    if (!window.confirm("Are you sure you want to submit? This cannot be undone.")) return;
 
+    setIsSubmitting(true);
     try {
-      const response = await fetch(`http://localhost:5000/prof/submit-quiz`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: token,
-          // Map answers to a clean format: { question_id: selected_option_id }
-          responses: quizData.questions.reduce((acc, q, index) => {
-            acc[q.id] = answers[index];
-            return acc;
-          }, {})
-        }),
-    });
+        // Format answers for Backend: { question_id: option_id }
+        const formattedAnswers = {};
+        quizData.questions.forEach((q, index) => {
+            formattedAnswers[q.id] = answers[index];
+        });
 
-    if (response.ok) {
-      const result = await response.json();
-      alert(`Quiz submitted successfully!`);
-      // Navigate to a "Thank You" or Results page
-      // window.location.href = '/quiz-completion';
+        const payload = {
+            token: token,
+            answers: formattedAnswers
+        };
+
+        await submitStudentQuiz(payload);
+
+        alert("Quiz Submitted Successfully!");
+        navigate('/student/dashboard'); 
+
+    } catch (err) {
+        console.error("Submission failed", err);
+        alert("Submission failed. Please try again.");
+    } finally {
+        setIsSubmitting(false);
     }
-  } catch (err) {
-    console.error("Submission failed", err);
-  }
-};
+  };
 
   return (
     <div className="quiz-page-layout">
+      {/* Sidebar with Navigation Status */}
       <QuizSidebar
         questions={quizData.questions}
         currentQuestion={currentQuestion}
         onQuestionSelect={(index) => {
           setCurrentQuestion(index);
-          setVisitedQuestions(prev => new Set([...prev, index])); // Mark as visited when clicked
+          setVisitedQuestions(prev => new Set([...prev, index]));
         }}
         questionStatuses={questionStatuses}
       />
-
+      
       <div className="quiz-main-content">
+        {/* Header */}
         <div className="quiz-header">
-          <h1>{quizData.title}</h1>
-          <div className="quiz-progress">
-            Question {currentQuestion + 1} of {quizData.questions.length}
-          </div>
+           <h1>{quizData.quiz.quiz_title}</h1>
+           <div className="quiz-progress">
+             Question {currentQuestion + 1} of {totalQuestions}
+           </div>
         </div>
-
+        
+        {/* Question Card */}
         <QuizQCard
           question={quizData.questions[currentQuestion]}
           selectedAnswer={answers[currentQuestion]}
@@ -139,25 +151,41 @@ const Quiz = () => {
           isMarkedReview={reviewFlags[currentQuestion]}
         />
 
+        {/* Navigation Buttons */}
         <div className="quiz-navigation-buttons">
-          <button
-            className="nav-btn btn-previous"
+          <button 
+            className="nav-btn" 
             onClick={handlePrevious}
             disabled={currentQuestion === 0}
           >
             ← Previous
           </button>
 
-          {currentQuestion === quizData.questions.length - 1 ? (
-            <button className="nav-btn btn-submit" onClick={handleSubmit}>
-              Submit Quiz
+          {currentQuestion === totalQuestions - 1 ? (
+            <button 
+                className={`nav-btn btn-submit ${allAnswered ? '' : 'disabled'}`} 
+                onClick={handleSubmit}
+                disabled={!allAnswered || isSubmitting}
+                style={{ backgroundColor: allAnswered ? '#28a745' : '#ccc', cursor: allAnswered ? 'pointer' : 'not-allowed' }}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
             </button>
           ) : (
-            <button className="nav-btn btn-next" onClick={handleNext}>
+            <button 
+                className="nav-btn" 
+                onClick={handleNext}
+            >
               Next →
             </button>
           )}
         </div>
+        
+        {/* Helper Text for Submission */}
+        {!allAnswered && currentQuestion === totalQuestions - 1 && (
+            <p style={{color: 'red', marginTop: '10px', textAlign: 'center'}}>
+                You must answer all questions before submitting.
+            </p>
+        )}
       </div>
     </div>
   );

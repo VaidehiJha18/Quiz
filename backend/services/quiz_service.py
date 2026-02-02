@@ -650,6 +650,36 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
         cursor.close()
         conn.close() 
 
+def get_professor_results_table(quiz_id):
+    """
+    Fetches the big table: Student Name, Enrollment, Course, Sem, Marks.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                s.f_name, s.l_name, s.enrollment_no, s.email,
+                qa.total_score, qa.submit_time, qa.attempt_id,
+                sem.sem_no, c.course_name
+            FROM student_quiz_attempt sqa
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN student s ON sqa.student_id = s.id
+            -- Join Academic Info to get Course/Sem
+            LEFT JOIN student_academic_info sai ON s.id = sai.student_id
+            LEFT JOIN semester sem ON sai.semester_id = sem.id
+            LEFT JOIN quizzes q ON sqa.quiz_id = q.id
+            LEFT JOIN course c ON q.course = c.id -- Assuming quiz table stores course ID
+            WHERE sqa.quiz_id = %s
+            ORDER BY qa.total_score DESC
+        """
+        cursor.execute(sql, (quiz_id,))
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
 # STUDENT SIDE
 def get_quiz_for_student(token):
@@ -699,35 +729,164 @@ def get_quiz_for_student(token):
     quiz_data['questions'] = list(quiz_data['questions'].values())
     return quiz_data
 
-def save_student_quiz_responses(quiz_id, student_id, responses):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+# def save_student_quiz_responses(quiz_id, student_id, responses):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
     
-    sql_insert_response = """
-        INSERT INTO student_quiz_responses (quiz_id, student_id, question_id, selected_option_id)
-        VALUES (%s, %s, %s, %s)
-    """
+#     sql_insert_response = """
+#         INSERT INTO student_quiz_responses (quiz_id, student_id, question_id, selected_option_id)
+#         VALUES (%s, %s, %s, %s)
+#     """
 
-    try:
-        response_entries = [
-            (quiz_id, student_id, q_id, option_id) 
-            for q_id, option_id in responses.items()
-        ]
+#     try:
+#         response_entries = [
+#             (quiz_id, student_id, q_id, option_id) 
+#             for q_id, option_id in responses.items()
+#         ]
 
-        cursor.executemany(sql_insert_response, response_entries)
-        conn.commit()
+#         cursor.executemany(sql_insert_response, response_entries)
+#         conn.commit()
         
+#     except Exception as e:
+#         conn.rollback()
+#         print(f"Database error: {e}")
+
+#     finally:
+#         cursor.close()
+#         conn.close()
+
+def submit_student_quiz(token, student_id, answers):
+    """
+    Calculates score and stores attempts in DB.
+    answers: dict { question_id: option_id }
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 1. Get Quiz ID from Token
+        cursor.execute("SELECT id FROM quizzes WHERE quiz_token = %s", (token,))
+        quiz = cursor.fetchone()
+        if not quiz: return None
+        quiz_id = quiz['id']
+
+        # 2. Calculate Score
+        total_score = 0
+        response_data = [] # List to store tuples for batch insert
+
+        for q_id, opt_id in answers.items():
+            # Check if option is correct
+            # Assumes answer_map has 'is_correct' boolean
+            cursor.execute("SELECT is_correct FROM answer_map WHERE id = %s", (opt_id,))
+            option = cursor.fetchone()
+            
+            marks = 0
+            if option and option['is_correct']:
+                # Get marks for this question
+                cursor.execute("SELECT marks FROM question_bank WHERE id = %s", (q_id,))
+                q_meta = cursor.fetchone()
+                marks = q_meta['marks'] if q_meta else 1
+                total_score += marks
+            
+            response_data.append((q_id, opt_id, marks))
+
+        # 3. Insert into quiz_attempt
+        cursor.execute("""
+            INSERT INTO quiz_attempt (total_score, attempt_status, submit_time, is_published)
+            VALUES (%s, 'Completed', NOW(), FALSE)
+        """, (total_score,))
+        attempt_id = cursor.lastrowid
+
+        # 4. Link Student -> Quiz -> Attempt
+        cursor.execute("""
+            INSERT INTO student_quiz_attempt (student_id, quiz_id, attempt_id)
+            VALUES (%s, %s, %s)
+        """, (student_id, quiz_id, attempt_id))
+
+        # 5. Store Responses (JSON logic stored relationally)
+        for q_id, opt_id, marks in response_data:
+            cursor.execute("""
+                INSERT INTO attempt_response (attempt_id, question_id, selected_option_id, marks_awarded)
+                VALUES (%s, %s, %s, %s)
+            """, (attempt_id, q_id, opt_id, marks))
+
+        conn.commit()
+        return {"score": total_score, "attempt_id": attempt_id}
+
     except Exception as e:
         conn.rollback()
-        print(f"Database error: {e}")
-
+        print(f"Error submitting quiz: {e}")
+        raise e
     finally:
         cursor.close()
         conn.close()
 
-def grade_student_quiz(quiz_id, student_id):
+def get_student_attempt_details(attempt_id):
+    """
+    Fetches the full quiz review: Questions, Selected Options, Correct Options, and Colors.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 1. Fetch Basic Attempt Info
+        cursor.execute("""
+            SELECT qa.total_score, qa.submit_time, q.quiz_title, q.total_questions 
+            FROM quiz_attempt qa
+            JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
+            JOIN quizzes q ON sqa.quiz_id = q.id
+            WHERE qa.attempt_id = %s
+        """, (attempt_id,))
+        attempt_meta = cursor.fetchone()
+        
+        if not attempt_meta: return None
+
+        # 2. Fetch All Responses (Questions + Selected Answer)
+        sql = """
+            SELECT 
+                q.id as question_id, q.question_txt, q.marks,
+                ar.selected_option_id, ar.marks_awarded
+            FROM attempt_response ar
+            JOIN question_bank q ON ar.question_id = q.id
+            WHERE ar.attempt_id = %s
+        """
+        cursor.execute(sql, (attempt_id,))
+        questions = cursor.fetchall()
+
+        # 3. For each question, fetch options and label them (Correct vs Selected)
+        for q in questions:
+            cursor.execute("SELECT id, option_text, is_correct FROM answer_map WHERE question_id = %s", (q['question_id'],))
+            options = cursor.fetchall()
+            
+            # Map options for Frontend
+            formatted_options = []
+            for opt in options:
+                is_selected = (opt['id'] == q['selected_option_id'])
+                is_correct = (opt['is_correct'] == 1)
+                
+                # Determine Color Status
+                status = "neutral"
+                if is_selected and is_correct:
+                    status = "correct" # Green
+                elif is_selected and not is_correct:
+                    status = "wrong"   # Red
+                elif not is_selected and is_correct:
+                    status = "missed"  # Show correct answer in Green (or lighter green)
+                
+                formatted_options.append({
+                    "id": opt['id'],
+                    "text": opt['option_text'],
+                    "status": status 
+                })
+            
+            q['options'] = formatted_options
+
+        return {
+            "meta": attempt_meta,
+            "questions": questions
+        }
+    finally:
+        cursor.close()
+        conn.close()
+
 
 # ==============================================================================================
 # if __name__ == "__main__":

@@ -1,0 +1,42 @@
+.result-container { padding: 20px; max-width: 800px; margin: 0 auto; }
+.result-header { text-align: center; margin-bottom: 30px; }
+.score-card { font-size: 1.5rem; color: #2c3e50; font-weight: bold; }
+
+.review-card { 
+    background: white; 
+    border: 1px solid #ddd; 
+    padding: 20px; 
+    margin-bottom: 20px; 
+    border-radius: 8px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.review-option {
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- Status Colors --- */
+.review-option.correct {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.review-option.wrong {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.review-option.missed {
+    background-color: #fff3cd; 
+    border-color: #ffeeba;
+    color: #856404;
+    border: 2px dashed #28a745; 
+}

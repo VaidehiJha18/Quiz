@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import './App.css';
+import QuizResult from './pages/QuizResult';
 
 // --- Components ---
 import HomePage from './pages/HomePage';
@@ -38,6 +39,7 @@ function App() {
 
         {/* Quiz Preview Route, for some reason it doesn't work when grouped with professor routes but works when outside it */}
         <Route path="/quiz-preview/:token" element={<QuizPreviewPage />} /> 
+        <Route path="/result/:attemptId" element={<QuizResult />} />
          
         {/* --- Professor Routes (Now wrapped in the new layout) --- */}
         {/* ✅ 2. WRAP all professor pages inside the ProfessorLayout route */}
@@ -50,6 +52,7 @@ function App() {
           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
           <Route path="results" element={<ResultsPage role="professor" />} />      
           <Route path="generate-quiz" element={<GenerateQuizPage />} />
+          
           
           {/* You will need to create components for these new pages */}
           <Route path="students" element={<h1>Manage Students Page</h1>} />

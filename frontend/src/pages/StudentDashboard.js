@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom'; // ✅ Added Link
 import StudentSidebar from '../components/layout/StudentSidebar';
 import StudentQuizCard from '../components/quiz/StudentQuizCard';
-import { fetchStudentProfile, fetchStudentDashboard } from '../api/apiService';
+import { fetchStudentProfile, fetchStudentDashboard, api } from '../api/apiService'; // ✅ Added api import
 
 const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -197,7 +198,7 @@ body {
   gap: 2rem;
 }
 
-/* Quiz Card */
+/* Quiz Card (Used for History too) */
 .quiz-card {
   background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
@@ -283,7 +284,8 @@ body {
   margin-right: 0.25rem;
 }
 
-.start-quiz-btn {
+/* Buttons */
+.start-quiz-btn, .btn-primary {
   width: 100%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -300,9 +302,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  text-decoration: none; /* For Links */
 }
 
-.start-quiz-btn:hover {
+.start-quiz-btn:hover, .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
 }
@@ -313,8 +316,35 @@ body {
   box-shadow: none;
 }
 
-.start-quiz-btn:disabled:hover {
-  transform: none;
+/* History Specific Styles */
+.history-card {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 15px;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-bottom: 1rem;
+}
+
+.history-info h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.history-info p {
+    color: #555;
+    font-weight: 500;
+}
+
+.pending-badge {
+    color: #7f8c8d;
+    font-style: italic;
+    background: rgba(0,0,0,0.05);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
 }
 
 /* Responsive Design */
@@ -342,6 +372,16 @@ body {
     gap: 1rem;
     align-items: flex-start;
   }
+  
+  .history-card {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+  }
+  
+  .history-card > div {
+      width: 100%;
+  }
 }
 `;
 
@@ -355,34 +395,31 @@ if (typeof document !== 'undefined') {
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('available');
   const [quizzes, setQuizzes] = useState([]);
+  const [history, setHistory] = useState([]); // ✅ Added History State
   const [loading, setLoading] = useState(true);
   
-  // ✅ NEW: State for Student Profile Data
   const [studentData, setStudentData] = useState({
     name: 'Loading...', 
     id: '...'
   });
 
   useEffect(() => {
-    // 1. Fetch Profile Data
+    // 1. Fetch Profile
     const loadProfile = async () => {
       try {
         const res = await fetchStudentProfile(); 
-        // Safety check: ensure we actually got a name back
         if (res.data && res.data.name) {
              setStudentData(res.data);
         } else if (res.data && res.data.f_name) {
-             // Handle case where DB column is f_name instead of name
              setStudentData({ ...res.data, name: res.data.f_name });
         }
       } catch (err) {
         console.error("Error loading profile:", err);
-        // Optional: Set a default name on error so it doesn't stay stuck on "Loading"
         setStudentData({ name: "Student", id: "N/A" });
       }
     };
 
-    // 2. Fetch Quizzes
+    // 2. Fetch Available Quizzes
     const loadQuizzes = async () => {
       try {
         const res = await fetchStudentDashboard();
@@ -394,8 +431,20 @@ const StudentDashboard = () => {
       }
     };
 
+    // 3. ✅ Fetch History
+    const loadHistory = async () => {
+        try {
+            // NOTE: Ensure your backend has this route, or use fetchStudentResults if that matches
+            const res = await api.get('/student/my-history');
+            setHistory(res.data || []);
+        } catch (err) {
+            console.error("Error loading history:", err);
+        }
+    };
+
     loadProfile();
     loadQuizzes();
+    loadHistory(); // Call the history loader
   }, []);
 
   const handleStartQuiz = (token) => {
@@ -428,10 +477,41 @@ const StudentDashboard = () => {
             ))}
           </div>
         );
+
       case 'history':
-        return <div className="quiz-cards-container"><div className="empty-state"><h3>Quiz History</h3><p>Your completed quizzes will appear here.</p></div></div>;
+        // ✅ NEW: Render the History List
+        if (history.length === 0) return <div className="empty-state" style={{ color: 'white', fontSize: '1.2rem' }}>No past attempts found.</div>;
+        
+        return (
+            <div className="quiz-cards-container">
+                <h2 style={{ color: 'white', marginBottom: '1rem', textShadow: '1px 1px 3px rgba(0,0,0,0.2)' }}>My Quiz History</h2>
+                {history.map(h => (
+                    <div key={h.attempt_id} className="history-card">
+                        <div className="history-info">
+                            <h3>{h.quiz_title}</h3>
+                            <p>Score: <strong>{h.total_score}</strong></p>
+                            <p style={{fontSize: '0.9rem', color: '#666'}}>Submitted: {new Date(h.submit_time).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                            {h.is_published ? (
+                                <Link 
+                                    to={`/result/${h.attempt_id}`}
+                                    className="btn-primary"
+                                    style={{ width: 'auto', display: 'inline-flex' }} // Override full width
+                                >
+                                    View Result
+                                </Link>
+                            ) : (
+                                <span className="pending-badge">Result Pending</span>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+
       case 'results':
-        return <div className="quiz-cards-container"><div className="empty-state"><h3>My Results</h3><p>Your scores will appear here after grading.</p></div></div>;
+        return <div className="quiz-cards-container"><div className="empty-state" style={{ color: 'white' }}><h3>Performance Analytics</h3><p>Detailed charts coming soon.</p></div></div>;
       default: return null;
     }
   };
@@ -453,7 +533,6 @@ const StudentDashboard = () => {
                 {studentData.name ? studentData.name.charAt(0) : 'S'}
               </div>
               <div className="profile-info">
-                {/* ✅ Display Real Name from Database */}
                 <div className="profile-name">{studentData.name}</div>
                 <div className="profile-id">ID: {studentData.id}</div>
               </div>

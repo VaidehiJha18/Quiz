@@ -72,10 +72,11 @@ export const fetchStudentProfile = () => api.get('/student/profile');
 export const fetchStudentDashboard = () => api.get('/student/dashboard');
 
 // 15. Submit Quiz Answers
-export const submitStudentQuiz = (quizId, answers) => api.post(`/student/quiz/${quizId}/submit`, answers);
+export const submitStudentQuiz = (data) => api.post(`/student/submit-quiz`, data);
 
 // 16. Fetch Student Results (History)
 export const fetchStudentResults = () => api.get('/student/results');
 
 // 17. Fetch Quiz Questions for Taking Quiz
 export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token}`);
+
