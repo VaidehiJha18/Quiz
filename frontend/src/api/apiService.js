@@ -53,3 +53,6 @@ export const fetchTeacherCourses = () => api.get('/prof/my-courses');
 
 // 9. Course stats (useful for debugging why generation fails)
 export const fetchCourseStats = (courseId) => api.get(`/prof/course-stats?course_id=${courseId}`);
+
+// 10. Fetch quiz results
+export const fetchQuizResults = (quizId) => api.get(`/prof/quiz-results/${quizId}`);

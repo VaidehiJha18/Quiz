@@ -351,6 +351,66 @@ def fetch_courses_list_view():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+#priyanka
+# ... existing imports ...
+
+@professor_bp.route('/results', methods=['GET'])
+def get_quiz_results():
+    course_id = request.args.get('course_id')
+    
+    if not course_id:
+        return jsonify({"message": "Course ID is required"}), 400
+
+    cur = mysql.connection.cursor()
+    
+    # ✅ THIS IS YOUR SQL QUERY LOGIC
+    # It joins students, attempts, and quizzes to get the full picture
+    # Ensure your table names (students, quiz_attempts, etc.) match exactly!
+    query = """
+        SELECT 
+            s.enrollment_no,
+            q.title AS quiz_title,
+            q.id AS quiz_id,
+            qa.id AS attempt_id,
+            qa.score,
+            qa.start_time,
+            qa.end_time,
+            CASE 
+                WHEN qa.id IS NOT NULL THEN 'Attempted' 
+                ELSE 'Not Attempted' 
+            END as status,
+            qa.response_link  -- Assuming you have a column for the link/file path
+        FROM students s
+        LEFT JOIN quizzes q ON q.course_id = s.course_id 
+        LEFT JOIN quiz_attempts qa ON s.id = qa.student_id AND q.id = qa.quiz_id
+        WHERE s.course_id = %s
+    """
+    
+    try:
+        cur.execute(query, (course_id,))
+        data = cur.fetchall()
+        cur.close()
+        
+        results_list = []
+        for row in data:
+            results_list.append({
+                'enrollmentNo': row[0],
+                'title': row[1],
+                'quizId': row[2],
+                'attemptId': row[3],
+                'score': row[4],
+                'startTime': str(row[5]) if row[5] else '-', # Handle None values
+                'endTime': str(row[6]) if row[6] else '-',
+                'status': row[7],
+                'responseLink': row[8]
+            })
+            
+        return jsonify(results_list), 200
+
+    except Exception as e:
+        print(f"Error fetching results: {e}")
+        return jsonify({"message": "Database error"}), 500
+    #priyanka
 
 # --- 2. Question Management Endpoints ---
 

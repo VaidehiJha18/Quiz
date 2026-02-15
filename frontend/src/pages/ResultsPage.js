@@ -74,7 +74,7 @@ export default function ResultsPage({ role }) {
   const handleCourseChange = async (e) => {
     const courseId = e.target.value;
     setSelections({ ...selections, course: courseId });
-    
+
     // Fetch results for this specific course
     if (courseId) {
       setLoading(true);
@@ -98,15 +98,41 @@ export default function ResultsPage({ role }) {
   };
 
   // --- TABLE CONFIG ---
+  // const columns = [
+  //   { Header: 'Quiz Title', accessor: 'title' },
+  //   { Header: role === 'student' ? 'Score' : 'Student & Score', accessor: 'scoreDisplay' },
+  // ];
+  //priyanka
   const columns = [
+    { Header: 'Quiz ID', accessor: 'quizId' },
+    { Header: 'Attempt ID', accessor: 'attemptId' },
     { Header: 'Quiz Title', accessor: 'title' },
-    { Header: role === 'student' ? 'Score' : 'Student & Score', accessor: 'scoreDisplay' },
+    { Header: 'Enrollment No.', accessor: 'enrollmentNo' },
+    { Header: 'Final Score', accessor: 'score' },
+    { Header: 'Start Time', accessor: 'startTime' },
+    { Header: 'End Time', accessor: 'endTime' },
+    { Header: 'Status', accessor: 'status' },
+    { Header: 'Response', accessor: 'responseLink' }, // Special handling for link
   ];
 
-  const data = results.map((r) => ({
-    title: r.title,
-    scoreDisplay: role === 'student' ? r.score : `${r.studentName || 'N/A'} - ${r.score}`,
+
+  // const data = results.map((r) => ({
+  //   title: r.title,
+  //   scoreDisplay: role === 'student' ? r.score : `${r.studentName || 'N/A'} - ${r.score}`,
+  // }));
+  //priyanka
+    const data = results.map((r) => ({
+    quizId: r.quizId,
+    attemptId: r.attemptId || '-',
+    title: r.title, // Maps 'title' from API to 'title' column
+    enrollmentNo: r.enrollmentNo,
+    score: r.score,
+    startTime: r.startTime,
+    endTime: r.endTime,
+    status: r.status, // You can add custom rendering here if needed (e.g., colors)
+    responseLink: r.responseLink // Assuming API sends a link or ID
   }));
+  //🍜🍜🍜
 
   return (
     <main className="main-content">
@@ -121,13 +147,30 @@ export default function ResultsPage({ role }) {
           handlers={filterHandlers}
         />
       </div>
+      {/* priyanka */}
+      {selections.course && (
+        <div className="dashboard-card">
+          {loading ? <p>Loading results...</p> : <Table columns={columns} data={data} />}
+        </div>
+      )}
+      {/* priyanka */}
 
-      <div className="dashboard-card">
+      {/* priyanka */}
+      {!selections.course && (
+        <div style={{ textAlign: 'center', marginTop: '20px', color: '#666' }}>
+          <p>Please select all dropdown options to view results.</p>
+        </div>
+      )}
+      {/* priyanka 🍜🍜🍜 */}
+
+
+      {/* <div className="dashboard-card">
         {loading ? <p>Loading results...</p> : <Table columns={columns} data={data} />}
-      </div>
+      </div> */}
     </main>
   );
 }
+
 
 const styles = {
   card: {
