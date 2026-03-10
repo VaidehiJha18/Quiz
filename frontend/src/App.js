@@ -18,6 +18,7 @@ import Quiz from './pages/Quiz';
 import GenerateQuizPage from './pages/GenerateQuizPage';
 import QuizPreviewPage from './pages/QuizPreviewPage';
 import ProfessorResultsPage from './pages/ProfessorResultsPage';
+import ProfessorAnalyticsPage from './pages/ProfessorAnalyticsPage';
 
 // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
 import ProfessorLayout from './components/layout/ProfessorLayout';
@@ -54,6 +55,7 @@ function App() {
           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
           <Route path="results" element={<ResultsPage role="professor" />} />      
           <Route path="generate-quiz" element={<GenerateQuizPage />} />
+          <Route path="/professor/analytics" element={<ProfessorAnalyticsPage />} />
           
           
           {/* You will need to create components for these new pages */}

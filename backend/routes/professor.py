@@ -463,3 +463,17 @@ def publish_results_api():
     if success:
         return jsonify({"message": "Results published to students!"}), 200
     return jsonify({"message": "Failed to publish"}), 500
+
+@professor_bp.route('/analytics', methods=['GET'])
+@professor_required
+def get_analytics_api():
+    teacher_id = session.get('id')
+    stats = quiz_service.get_dashboard_analytics(teacher_id)
+    return jsonify(stats), 200
+
+@professor_bp.route('/export-marks', methods=['GET'])
+@professor_required
+def export_marks_api():
+    teacher_id = session.get('id')
+    data = quiz_service.get_all_student_marks_for_export(teacher_id)
+    return jsonify(data), 200

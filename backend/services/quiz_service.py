@@ -675,6 +675,87 @@ def get_professor_results_table(quiz_id):
         cursor.close()
         conn.close()
 
+# --- ANALYTICS DASHBOARD --- ❤️❤️❤️❤️❤️❤️
+
+def get_dashboard_analytics(teacher_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 1. Total Quizzes Published
+        cursor.execute("SELECT COUNT(id) as total_quizzes FROM quizzes WHERE teacher_id = %s", (teacher_id,))
+        total_quizzes = cursor.fetchone()['total_quizzes']
+
+        # 2. Collective Performance (Total, Average, High, Low)
+        sql_stats = """
+            SELECT 
+                COUNT(qa.attempt_id) as total_attempts,
+                AVG(qa.total_score) as average_score,
+                MAX(qa.total_score) as highest_score,
+                MIN(qa.total_score) as lowest_score
+            FROM quizzes q
+            JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            WHERE q.teacher_id = %s
+        """
+        cursor.execute(sql_stats, (teacher_id,))
+        stats = cursor.fetchone()
+
+        # 3. Recent Activity (Last 5 Student Submissions)
+        sql_recent = """
+            SELECT 
+                s.f_name, s.l_name,
+                q.quiz_title,
+                qa.total_score,
+                qa.submit_time
+            FROM quizzes q
+            JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN student s ON sqa.student_id = s.id
+            WHERE q.teacher_id = %s
+            ORDER BY qa.submit_time DESC
+            LIMIT 5
+        """
+        cursor.execute(sql_recent, (teacher_id,))
+        recent_activity = cursor.fetchall()
+
+        # Format datetime for JSON serialization
+        for act in recent_activity:
+            if act['submit_time']:
+                act['submit_time'] = act['submit_time'].isoformat()
+
+        return {
+            "total_quizzes": total_quizzes,
+            "total_attempts": stats['total_attempts'] or 0,
+            "average_score": round(stats['average_score'] or 0, 2),
+            "highest_score": stats['highest_score'] or 0,
+            "lowest_score": stats['lowest_score'] or 0,
+            "recent_activity": recent_activity
+        }
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_all_student_marks_for_export(teacher_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                q.quiz_title, q.course,
+                s.f_name, s.l_name, s.enrollment_no, 
+                qa.total_score, qa.submit_time
+            FROM quizzes q
+            JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN student s ON sqa.student_id = s.id
+            WHERE q.teacher_id = %s
+            ORDER BY q.created_at DESC, qa.total_score DESC
+        """
+        cursor.execute(sql, (teacher_id,))
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
 # STUDENT SIDE
