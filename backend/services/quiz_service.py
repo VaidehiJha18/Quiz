@@ -651,25 +651,21 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
         conn.close() 
 
 def get_professor_results_table(quiz_id):
-    """
-    Fetches the big table: Student Name, Enrollment, Course, Sem, Marks.
-    """
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
         sql = """
             SELECT 
+                q.id AS quiz_id,
+                q.quiz_title,
                 s.f_name, s.l_name, s.enrollment_no, s.email,
-                qa.total_score, qa.submit_time, qa.attempt_id,
-                sem.sem_no, c.course_name
+                qa.attempt_id, qa.total_score, qa.start_time, qa.submit_time, qa.is_published, 
+                REPLACE(q.semester, 'Semester ', '') AS sem_no,
+                q.course AS course_name
             FROM student_quiz_attempt sqa
             JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             JOIN student s ON sqa.student_id = s.id
-            -- Join Academic Info to get Course/Sem
-            LEFT JOIN student_academic_info sai ON s.id = sai.student_id
-            LEFT JOIN semester sem ON sai.semester_id = sem.id
-            LEFT JOIN quizzes q ON sqa.quiz_id = q.id
-            LEFT JOIN course c ON q.course = c.id -- Assuming quiz table stores course ID
+            JOIN quizzes q ON sqa.quiz_id = q.id
             WHERE sqa.quiz_id = %s
             ORDER BY qa.total_score DESC
         """
@@ -883,6 +879,38 @@ def get_student_attempt_details(attempt_id):
             "meta": attempt_meta,
             "questions": questions
         }
+    finally:
+        cursor.close()
+        conn.close()
+
+# 13. Publish Quiz Results to Students
+def publish_quiz_results(attempt_ids):
+    """
+    Updates the quiz_attempt table to set is_published = TRUE for given attempt IDs.
+    """
+    if not attempt_ids:
+        return False
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Create placeholders like %s, %s, %s depending on how many students there are
+        placeholders = ', '.join(['%s'] * len(attempt_ids))
+        
+        # SQL to update all selected attempts at once
+        sql = f"""
+            UPDATE quiz_attempt 
+            SET is_published = TRUE 
+            WHERE attempt_id IN ({placeholders})
+        """
+        
+        cursor.execute(sql, tuple(attempt_ids))
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Error publishing quiz results: {e}")
+        return False
     finally:
         cursor.close()
         conn.close()

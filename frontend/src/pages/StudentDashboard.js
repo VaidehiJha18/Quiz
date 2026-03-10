@@ -466,7 +466,7 @@ const StudentDashboard = () => {
                     id: quiz.id,
                     title: quiz.quiz_title,
                     questions: quiz.total_questions,
-                    duration: `${quiz.duration || 30} minutes`,
+                    duration: `${quiz.duration || 10} minutes`,
                     professor: quiz.teacher,
                     dueDate: quiz.created_at ? new Date(quiz.created_at).toLocaleDateString() : 'N/A',
                     status: 'available',
@@ -489,7 +489,6 @@ const StudentDashboard = () => {
                     <div key={h.attempt_id} className="history-card">
                         <div className="history-info">
                             <h3>{h.quiz_title}</h3>
-                            <p>Score: <strong>{h.total_score}</strong></p>
                             <p style={{fontSize: '0.9rem', color: '#666'}}>Submitted: {new Date(h.submit_time).toLocaleDateString()}</p>
                         </div>
                         <div>

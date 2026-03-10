@@ -17,6 +17,7 @@ import ResultsPage from './pages/ResultsPage';
 import Quiz from './pages/Quiz';
 import GenerateQuizPage from './pages/GenerateQuizPage';
 import QuizPreviewPage from './pages/QuizPreviewPage';
+import ProfessorResultsPage from './pages/ProfessorResultsPage';
 
 // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
 import ProfessorLayout from './components/layout/ProfessorLayout';
@@ -47,6 +48,7 @@ function App() {
           <Route path="dashboard" element={<ProfessorDashboard />} />
           <Route path="quizzes" element={<ViewQuizzesPage />} />
           <Route path="questions" element={<ViewQuestionsPage />} />
+          <Route path="/professor/quiz-results/:quizId" element={<ProfessorResultsPage />} />
 
           <Route path="questions/add" element={<EditQuestionsPage isNew />} />
           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
