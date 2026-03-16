@@ -7,7 +7,7 @@ import MessageDisplay from '../components/ui/MessageDisplay';
 
 export default function SignupPage() {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "student" });
+    const [formData, setFormData] = useState({ name: "", email: "", password: "" });
     const [message, setMessage] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -19,7 +19,8 @@ export default function SignupPage() {
         setMessage(null);
         try {
             // --- MODIFIED: Use the environment variable for a flexible API URL ---
-            const apiUrl = `${process.env.REACT_APP_API_URL}/auth/signup`;
+            // const apiUrl = `${process.env.REACT_APP_API_URL}/auth/signup`;
+            const apiUrl = `http://localhost:5000/auth/signup`;
 
             const response = await fetch(apiUrl, {
                 method: "POST",
@@ -52,7 +53,7 @@ export default function SignupPage() {
                     <FormInput label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Enter your email" icon="email" />
                     <FormInput label="Password" type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Create a password" icon="password" />
 
-                    <div className="role-selector-group">
+                    {/* <div className="role-selector-group">
                         <p>I am a:</p>
                         <div className="role-selector">
                             <label>
@@ -64,7 +65,7 @@ export default function SignupPage() {
                                 <span>Professor</span>
                             </label>
                         </div>
-                    </div>
+                    </div> */}
 
                     <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={isLoading}>
                         {isLoading ? 'Creating Account...' : 'Sign Up'}

@@ -62,27 +62,45 @@ class AuthService:
             return self.ph.verify(stored_hash, password)
         except argon2_exceptions.VerifyMismatchError:
             return False   
-        
 
     # ----------------- SIGNUP -----------------
+    #Priyanka
     def register_user(self, user_name, email, password):
         password_hash = self._hash_password(password)
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
         try:
-            # Check if user exists
+            # Check if user exists in the main accounts table
             cursor.execute("SELECT user_id FROM user_account WHERE email=%s", (email,))
             if cursor.fetchone():
                 raise ValueError("User with this email already exists")
+            
+            # 1. Check if email is in the Employee table (Professors/Admins)
+            cursor.execute("SELECT id FROM employee WHERE email=%s", (email,))
+            emp_record = cursor.fetchone()
 
-            # 2. Determine role based on email regex
-            role_id = self._determine_role(email)
-            role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
-            role_name = role_name_map[role_id]
-
-            # 3. ✅ NEW: VALIDATE AGAINST MASTER TABLE --> throws error if email not in maters table
-            master_id = self._validate_master_account(email, role_name, cursor)
+            if emp_record:
+                master_id = emp_record['id']
+                # Check if it's an admin based on regex, otherwise it's a professor
+                if re.match(self.ADMIN_EMAIL_PATTERN, email):
+                    role_id = self.ROLE_MAPPING['admin']
+                else:
+                    role_id = self.ROLE_MAPPING['professor']
+            
+            else:
+                # 2. If not an employee, check if email is in the Student table
+                cursor.execute("SELECT id FROM student WHERE email=%s", (email,))
+                stu_record = cursor.fetchone()
+                
+                if stu_record:
+                    master_id = stu_record['id']
+                    role_id = self.ROLE_MAPPING['student']
+                else:
+                    # 3. If in NEITHER table, reject the signup
+                    raise ValueError("Email not found in the university database. Cannot register.")
+                
+            # Note: We completely removed _determine_role and _validate_master_account from here!
 
             # 4. Insert into user_account
             sql = "INSERT INTO user_account (user_id, user_name, email, password_hash, role_id) VALUES (%s, %s, %s, %s, %s)"
@@ -93,6 +111,7 @@ class AuthService:
         finally:
             cursor.close()
             conn.close()
+            #Priyanka
 
     # ----------------- LOGIN -----------------
     def authenticate_user(self, email, password):
