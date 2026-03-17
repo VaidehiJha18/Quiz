@@ -1,96 +1,28 @@
-// import React, { useEffect, useState } from 'react';
-// import { Link } from 'react-router-dom';
-// import Card from '../components/ui/Card'; 
-// import { fetchQuestions } from '../api/apiService';
-
-
-// export default function ProfessorDashboard() {
-//   const [questionCount, setQuestionCount] = useState(0);
-
-//   useEffect(() => {
-//     const loadQuestions = async () => {
-//       try {
-//         const res = await fetchQuestions();
-
-//         if (res.data && typeof res.data === 'object') {
-//           setQuestionCount(Object.keys(res.data).length);
-//         } else {
-//           setQuestionCount(0);
-//         }
-//       } catch (err) {
-//         console.error("Error loading questions on dashboard:", err);
-//         setQuestionCount(0);
-//       }
-//     };
-//     loadQuestions();
-//   }, []);
-
-//   return (
-//     <main className="main-content">
-//       <div className="top-bar">
-//         <h1>Professor Dashboard</h1>
-//       </div>
-
-//       <div className="dashboard-grid">
-//         <Card className="card card-left-align">
-//           <h3>Manage Questions</h3>
-//           {/*  */}
-//           <p>Total Questions: {questionCount}</p>
-//           <Link to="/professor/questions" className="btn btn-primary">
-//             View Questions
-//           </Link>
-//         </Card>
-
-//         <Card className="card card-left-align">
-//           <h3>View Quizzes</h3>
-//           <p>See all quizzes and get shareable links.</p>
-//           <Link to="/professor/quizzes" className="btn btn-primary">
-//             View Quizzes
-//           </Link>
-//         </Card>
-
-//         <Card className="card card-left-align">
-//           <h3>View Results</h3>
-//           <p>See all student quiz performance.</p>
-//           <Link to="/professor/results" className="btn btn-accent">
-//             View Results
-//           </Link>
-//         </Card>
-//       </div>
-//     </main>
-//   );
-// }
-
 // ❤️❤️❤️
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card'; 
-import { fetchQuestions, api } from '../api/apiService'; 
+import { api } from '../api/apiService'; // Removed fetchQuestions
+// import { fetchQuestions, api } from '../api/apiService'; 
 
 export default function ProfessorDashboard() {
   const [questionCount, setQuestionCount] = useState(0);
   const [analytics, setAnalytics] = useState({
       total_quizzes: 0,
-      total_attempts: 0
+      total_attempts: 0,
+      total_questions: 0 // ✅ Added question count to analytics state
   });
 
   useEffect(() => {
     const loadData = async () => {
-      // 1. Load Question Count
-      try {
-        const resQ = await fetchQuestions();
-        if (resQ.data && typeof resQ.data === 'object') {
-          setQuestionCount(Object.keys(resQ.data).length);
-        }
-      } catch (err) { console.error(err); }
-
-      // 2. Load basic analytics for the quick-stats row
+      // 1. Load basic analytics for the quick-stats row
       try {
         const resA = await api.get('/prof/analytics');
         if (resA.data) {
             setAnalytics({
-                total_quizzes: resA.data.total_quizzes,
-                total_attempts: resA.data.total_attempts
+                total_quizzes: resA.data.total_quizzes || 0,
+                total_attempts: resA.data.total_attempts || 0,
+                total_questions: resA.data.total_questions || 0 // ✅ Read specific teacher's questions
             });
         }
       } catch (err) { console.error(err); }
@@ -156,7 +88,7 @@ export default function ProfessorDashboard() {
               <div className="stat-label">Quizzes Conducted</div>
           </div>
           <div className="stat-box blue">
-              <div className="stat-num">{questionCount}</div>
+              <div className="stat-num">{analytics.total_questions}</div>
               <div className="stat-label">Questions in Bank</div>
           </div>
           <div className="stat-box orange">

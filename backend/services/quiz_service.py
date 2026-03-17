@@ -685,7 +685,11 @@ def get_dashboard_analytics(teacher_id):
         cursor.execute("SELECT COUNT(id) as total_quizzes FROM quizzes WHERE teacher_id = %s", (teacher_id,))
         total_quizzes = cursor.fetchone()['total_quizzes']
 
-        # 2. Collective Performance (Total, Average, High, Low)
+        # 2. Total Questions by this Professor (✅ NEW)
+        cursor.execute("SELECT COUNT(question_id) as total_questions FROM question_employee WHERE employee_id = %s", (teacher_id,))
+        total_questions = cursor.fetchone()['total_questions']
+
+        # 3. Collective Performance (Total, Average, High, Low)
         sql_stats = """
             SELECT 
                 COUNT(qa.attempt_id) as total_attempts,
@@ -700,7 +704,7 @@ def get_dashboard_analytics(teacher_id):
         cursor.execute(sql_stats, (teacher_id,))
         stats = cursor.fetchone()
 
-        # 3. Recent Activity (Last 5 Student Submissions)
+        # 4. Recent Activity (Last 5 Student Submissions)
         sql_recent = """
             SELECT 
                 s.f_name, s.l_name,
@@ -725,6 +729,7 @@ def get_dashboard_analytics(teacher_id):
 
         return {
             "total_quizzes": total_quizzes,
+            "total_questions": total_questions,
             "total_attempts": stats['total_attempts'] or 0,
             "average_score": round(stats['average_score'] or 0, 2),
             "highest_score": stats['highest_score'] or 0,

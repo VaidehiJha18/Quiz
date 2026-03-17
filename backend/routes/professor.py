@@ -141,6 +141,9 @@ def fetch_courses_list_view():
         # Cast inputs to integers
         dept_id_int = int(dept_id_raw)
         semester_id_int = int(semester_id_raw)
+
+        # ✅ 1. Get the logged-in Professor's ID
+        teacher_id = session.get('id')
         
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -150,9 +153,12 @@ def fetch_courses_list_view():
             FROM course c
             JOIN semester_course sc ON c.id = sc.course_id
             JOIN department_semester ds ON sc.semester_id = ds.semester_id
-            WHERE ds.dept_id = %s AND sc.semester_id = %s
+            JOIN teacher_course_division tcd ON c.id = tcd.course_id
+            WHERE ds.dept_id = %s 
+            AND sc.semester_id = %s
+            AND tcd.teacher_id = %s
         """     
-        cursor.execute(sql, (dept_id_int, semester_id_int))
+        cursor.execute(sql, (dept_id_int, semester_id_int, teacher_id))
         data = cursor.fetchall()
         return jsonify(data), 200
     except Exception as e:
