@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import './QuizResult.css'; // You'll create this CSS next
 
+
 const QuizResult = () => {
   const { attemptId } = useParams();
   const [result, setResult] = useState(null);

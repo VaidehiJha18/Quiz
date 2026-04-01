@@ -40,7 +40,7 @@ def student_dashboard():
                 q.course, 
                 q.teacher, 
                 q.total_questions, 
-                q.duration, 
+                q.time_limit, 
                 q.quiz_token,
                 q.quiz_status,
                 q.created_at
@@ -55,7 +55,7 @@ def student_dashboard():
                 )
             ORDER BY q.created_at DESC
         """
-        # ✅ Pass student_id as the 3rd parameter
+        #  Pass student_id as the 3rd parameter
         cursor.execute(quiz_sql, (sem_id, div_id, student_id))
         quizzes = cursor.fetchall()
         
@@ -103,19 +103,19 @@ def take_quiz_student_view(token):
         
         # 3. Fetch Options and Format them perfectly for React
         for q in questions:
-            # A. Map 'question_txt' to 'text' (Required by Line 5 of QuizQCard.js)
+          
             q['text'] = q['question_txt'] 
 
-            # B. Fetch Options
+          
             cursor.execute("SELECT id, option_text FROM answer_map WHERE question_id = %s ORDER BY id ASC", (q['id'],))
             opts = cursor.fetchall()
             
-            # C. Format Options Array (Required by Line 15 of QuizQCard.js)
+            
             formatted_opts = []
             for opt in opts:
                 formatted_opts.append({
-                    "id": opt['id'],           # Required by Line 17 (key={option.id})
-                    "text": opt['option_text'] # Required by Line 25 ({option.text})
+                    "id": opt['id'],           
+                    "text": opt['option_text'] 
                 })
             q['options'] = formatted_opts 
 
@@ -136,7 +136,7 @@ def take_quiz_student_view(token):
 def submit_student_quiz_route():
     data = request.get_json()
     token = data.get('token')
-    answers = data.get('answers') # { q_id: opt_id }
+    answers = data.get('answers') 
     student_id = session.get('id')
 
     if not student_id or not token or not answers:
