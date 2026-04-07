@@ -20,7 +20,8 @@ body {
 /* Dashboard Layout */
 .student-dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fda085 100%);
 }
 
@@ -119,6 +120,7 @@ body {
   flex: 1;
   padding: 2.5rem 3rem;
   overflow-y: auto;
+  height: 100vh;
 }
 
 /* Top Bar */

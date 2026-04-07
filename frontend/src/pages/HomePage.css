@@ -219,14 +219,17 @@ div[style*="flex-direction: column"] {
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8rem; /* Increased from 2rem */
+  gap: 2rem; /* Increased from 2rem */
   width: 100%;
   max-width: 900px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
 }
 /* On screens wider than 768px, switch to two columns */
 @media (min-width: 768px) {
   .dashboard-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 4rem;
   }
 }
 
@@ -612,7 +615,8 @@ div[style*="flex-direction: column"] {
  /* --- New Dashboard Layout --- */
 .dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* --- Sidebar Styles --- */
@@ -698,8 +702,7 @@ div[style*="flex-direction: column"] {
 /* --- Main Content Area Styles --- */
 .main-content {
   flex-grow: 1; /* Takes up remaining space */
-  background-color: #f4f7f9;
-  padding: 2rem 3rem;
+ width: 100%;
 }
 
 .top-bar {
@@ -764,13 +767,6 @@ div[style*="flex-direction: column"] {
   max-width: 300px;
 }
 
-/* --- Main Content Area Styles --- */
-.main-content {
-  flex-grow: 1; /* This is the key property */
-  background-color: #f4f7f9;
-  padding: 2rem 3rem;
-  width: 100%; /* Add this to help with layout calculations */
-}
 
 /* --- Table/Wide Card Overrides --- */
 
