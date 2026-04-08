@@ -675,6 +675,7 @@ def get_professor_results_table(quiz_id):
         cursor.close()
         conn.close()
 
+
 # --- ANALYTICS DASHBOARD --- ❤️❤️❤️❤️❤️❤️
 
 def get_dashboard_analytics(teacher_id):
@@ -836,6 +837,8 @@ def get_quiz_for_student(token):
 #     finally:
 #         cursor.close()
 #         conn.close()
+
+# ---  Submit Quiz Answers ---
 
 def submit_student_quiz(token, student_id, answers):
     """
