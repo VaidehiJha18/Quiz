@@ -75,6 +75,8 @@ export default function QuizPage() {
     }
   }, [quiz, answers, isSubmitting, submitted, quizId, navigate]);
 
+  
+
   // ── Anti-cheat: get FreezeOverlay from the hook ───────────────────────────
   const { FreezeOverlay } = useAntiCheat(
     isQuizStarted,

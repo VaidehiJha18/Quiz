@@ -7,6 +7,8 @@ import './Quiz.css';
 // ─────────────────────────────────────────────────────────────────────────────
 // Anti-cheat hook — all lockdown logic lives here, cleanly separated
 // ─────────────────────────────────────────────────────────────────────────────
+
+
 function useAntiCheat(isActive, submitted, onViolation) {
   const violationCount = useRef(0);
   const isProcessing = useRef(false); 

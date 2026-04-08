@@ -189,5 +189,6 @@ export default function useAntiCheat(isActive, submitted, onViolation) {
     );
   };
 
+  
   return { FreezeOverlay };
 }
