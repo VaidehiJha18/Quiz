@@ -218,16 +218,16 @@
 
 
 .quiz-option.selected {
-  /* Change the entire card background to your theme purple */
+
   background-color: #5a3e8d !important;
   border-color: #5a3e8d !important;
-  /* Change the text color to white for readability */
+
   color: white !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(90, 62, 141, 0.4);
 }
 
-/* Ensure the A, B, C, D indicator also looks good on the purple background */
+
 .quiz-option.selected .option-indicator {
   background-color: white !important;
   color: #5a3e8d !important;
