@@ -703,6 +703,7 @@ def get_professor_results_table(quiz_id):
         cursor.close()
         conn.close()
 
+
 # --- ANALYTICS DASHBOARD --- ❤️❤️❤️❤️❤️❤️
 
 def get_dashboard_analytics(teacher_id):
@@ -839,31 +840,8 @@ def get_quiz_for_student(token):
     quiz_data['questions'] = list(quiz_data['questions'].values())
     return quiz_data
 
-# def save_student_quiz_responses(quiz_id, student_id, responses):
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-    
-#     sql_insert_response = """
-#         INSERT INTO student_quiz_responses (quiz_id, student_id, question_id, selected_option_id)
-#         VALUES (%s, %s, %s, %s)
-#     """
 
-#     try:
-#         response_entries = [
-#             (quiz_id, student_id, q_id, option_id) 
-#             for q_id, option_id in responses.items()
-#         ]
-
-#         cursor.executemany(sql_insert_response, response_entries)
-#         conn.commit()
-        
-#     except Exception as e:
-#         conn.rollback()
-#         print(f"Database error: {e}")
-
-#     finally:
-#         cursor.close()
-#         conn.close()
+# ---  Submit Quiz Answers ---
 
 def submit_student_quiz(token, student_id, answers):
     """

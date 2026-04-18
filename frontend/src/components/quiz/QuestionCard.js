@@ -1,6 +1,5 @@
 import React from 'react';
 
-// This component uses the new CSS classes we added to HomePage.css
 
 export default function QuestionCard({
   questionId,
@@ -16,17 +15,18 @@ export default function QuestionCard({
         {options.map((option, index) => (
           <label
             key={index}
-            // The 'selected' class is added conditionally
+            // Ensure 'selected' class is applied when values match
             className={`question-option ${selectedValue === option ? 'selected' : ''}`}
           >
             <input
               type="radio"
               name={`question-${questionId}`}
               value={option}
-              onChange={() => onSelect(option)}
-              // Hide the default radio button
+              // FIX: Pass questionId so handleSelect in QuizPage updates correctly
+              onChange={() => onSelect(questionId, option)} 
               style={{ display: 'none' }} 
             />
+            {/* Display the option text */}
             {option}
           </label>
         ))}
@@ -34,3 +34,5 @@ export default function QuestionCard({
     </div>
   );
 }
+
+

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // ✅ Added Link
+import { Link } from 'react-router-dom'; 
 import StudentSidebar from '../components/layout/StudentSidebar';
 import StudentQuizCard from '../components/quiz/StudentQuizCard';
-import { fetchStudentProfile, fetchStudentDashboard, api } from '../api/apiService'; // ✅ Added api import
+import { fetchStudentProfile, fetchStudentDashboard, api } from '../api/apiService'; 
 
 const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -468,7 +468,7 @@ const StudentDashboard = () => {
                     id: quiz.id,
                     title: quiz.quiz_title,
                     questions: quiz.total_questions,
-                    duration: `${quiz.duration || 10} minutes`,
+                    duration: `${quiz.time_limit || 10} minutes`,
                     professor: quiz.teacher,
                     dueDate: quiz.created_at ? new Date(quiz.created_at).toLocaleDateString() : 'N/A',
                     status: 'available',
