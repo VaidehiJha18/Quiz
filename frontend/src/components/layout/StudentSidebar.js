@@ -19,7 +19,7 @@ const StudentSidebar = ({ activeTab, onTabChange }) => {
   ];
 
   return (
-    <div className="student-sidebar">
+    <div className="student-sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header Section */}
       <div className="university-header">
         <div className="university-logo">🎓</div>
@@ -27,26 +27,36 @@ const StudentSidebar = ({ activeTab, onTabChange }) => {
         <p className="university-tagline">EDUCATION RE-ENVISIONED</p>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="sidebar-nav">
-        {/* Mapped Menu Items */}
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            className={`sidebar-nav-item ${activeTab === item.id ? 'active' : ''}`}
-            onClick={() => onTabChange(item.id)}
-          >
-            <div className="nav-icon">{item.icon}</div>
-            <span>{item.label}</span>
-          </button>
-        ))}
+      {/* Navigation Links Wrapper */}
+      <nav 
+        className="sidebar-nav" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          flexGrow: 1, 
+          justifyContent: 'space-between' /* ✅ This is the magic property that forces separation */
+        }}
+      >
+        {/* Top items grouped together */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              className={`sidebar-nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => onTabChange(item.id)}
+            >
+              <div className="nav-icon">{item.icon}</div>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
 
-        {/* Logout Button (Pushed to bottom) */}
+        {/* Logout Button (Pushed to absolute bottom) */}
         <button 
           className="sidebar-nav-item logout-btn" 
           onClick={handleLogout}
           style={{ 
-            marginTop: 'auto', 
+            marginTop: '1rem', /* Safe spacing for split-screen */
             background: 'rgba(255, 99, 71, 0.15)', // Light Red background
             border: '1px solid rgba(255, 99, 71, 0.3)' 
           }}

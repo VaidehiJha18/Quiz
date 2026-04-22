@@ -66,7 +66,7 @@ export const deleteQuiz = (quizId) => api.delete(`/prof/quizzes/${quizId}`);
 // STUDENT ENDPOINTS
 
 // 13. Get Student Profile (Name, ID)
-export const fetchStudentProfile = () => api.get('/student/profile');
+export const fetchStudentProfile = () => api.get('/auth/profile');
 
 // 14. Get Student Dashboard (My Quizzes)
 export const fetchStudentDashboard = () => api.get('/student/dashboard');

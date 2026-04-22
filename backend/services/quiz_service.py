@@ -626,7 +626,7 @@ def get_divisions_for_publish(teacher_id, course_id):
         conn.close()
 
 # Add this function to handle the Publish logic
-def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
     """Updates quiz status and links it to specific divisions."""
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -634,10 +634,10 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
         # 1. Update Quiz Metadata (Time Limit & Status)
         update_quiz_sql = """
             UPDATE quizzes 
-            SET time_limit = %s, quiz_status = 'Published' 
+            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s 
             WHERE id = %s
         """
-        cursor.execute(update_quiz_sql, (time_limit, quiz_id))
+        cursor.execute(update_quiz_sql, (time_limit, quiz_title, quiz_id))
 
         # 2. Get Course and Semester info from the quiz to ensure consistency
         get_ids_sql = """

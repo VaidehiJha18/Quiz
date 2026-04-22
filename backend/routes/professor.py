@@ -441,11 +441,13 @@ def publish_quiz_api(quiz_id):
     time_limit = data.get('time_limit')
     division_ids = data.get('division_ids') # Array of IDs, e.g., [1, 2]
 
-    if not time_limit or not division_ids:
-        return jsonify({"message": "Missing time limit or divisions"}), 400
+    quiz_title = data.get('quiz_title')
 
-    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids)
-    
+    if not time_limit or not division_ids or not quiz_title:
+        return jsonify({"message": "Missing time limit, divisions, or quiz title"}), 400
+
+    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title)
+
     if success:
         return jsonify({"message": "Quiz published successfully!"}), 200
     else:

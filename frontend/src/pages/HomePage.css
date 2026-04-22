@@ -728,6 +728,70 @@ div[style*="flex-direction: column"] {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
+/*❤️❤️❤️ --- ULTIMATE RESPONSIVE FIX FOR SPLIT SCREEN & MOBILE --- */
+
+@media (max-width: 1024px) {
+  /* 1. Shrink the massive padding in the main content area */
+  .main-content,
+  .student-main-content,
+  div[style*="flex: 1"] {
+    padding: 15px !important;
+    overflow-y: auto !important;
+  }
+
+  /* 2. Force the Top Banner to stack vertically */
+  .top-bar, 
+  .page-header,
+  div[style*="justify-content: space-between"] {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 15px !important;
+    height: auto !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 3. Ensure the Profile Button doesn't overflow */
+  .user-profile {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* 4. Force cards to shrink and stay inside the screen */
+  .card, 
+  .dashboard-card,
+  div[style*="border-radius:"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 5. Reduce the Sidebar width slightly */
+  .sidebar {
+    width: 200px !important;
+    padding: 1rem !important;
+  }
+}
+
+/* --- FOR EXTREME SPLIT SCREEN (Very Small Widths) --- */
+@media (max-width: 700px) {
+  /* Stack the Sidebar ON TOP of the main content instead of side-by-side */
+  .dashboard-layout,
+  .student-dashboard-layout,
+  div[style*="display: flex"][style*="height: 100vh"] {
+    flex-direction: column !important;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+  
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+  }
+}
+
 /* --- New Generate Quiz Card Style --- */
 .generate-quiz-card {
   background: #ffffff;
