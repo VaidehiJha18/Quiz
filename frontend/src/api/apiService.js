@@ -25,6 +25,17 @@ export const deleteQuestion = (id) => api.delete(`/prof/delete_question/${id}`);
 export const updateQuestion = (id, data) => api.put(`/prof/questions/${id}`, data);
 export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);
 
+// --- Professor Manage Students Endpoints ---
+
+export const fetchCourseRoster = (courseId) => 
+    api.get(`/prof/course-roster?course_id=${courseId}`);
+
+export const fetchStudentHistory = (studentId, courseId) => 
+    api.get(`/prof/students/${studentId}/history?course_id=${courseId}`);
+
+export const overrideStudentGrade = (attemptId, newScore) => 
+    api.put(`/prof/attempts/${attemptId}/override`, { new_score: newScore });
+
 // --- Dropdown API Calls (Add these to the bottom of apiService.js) ---
 
 // 1. Get schools
@@ -80,3 +91,4 @@ export const fetchStudentResults = () => api.get('/student/results');
 // 17. Fetch Quiz Questions for Taking Quiz
 export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token}`);
 
+// ADMIN ENDPOINT ❤️❤️❤️

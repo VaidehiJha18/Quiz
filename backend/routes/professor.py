@@ -500,3 +500,40 @@ def delete_attempt_api(attempt_id):
 def get_pending_students_api(quiz_id):
     students = quiz_service.get_pending_students(quiz_id)
     return jsonify(students), 200
+
+@professor_bp.route('/course-roster', methods=['GET'])
+@professor_required
+def get_course_roster_api():
+    teacher_id = session.get('id')
+    course_id = request.args.get('course_id')
+    if not course_id:
+        return jsonify([]), 200
+        
+    roster = quiz_service.get_professor_course_roster(teacher_id, course_id)
+    return jsonify(roster), 200
+
+@professor_bp.route('/students/<int:student_id>/history', methods=['GET'])
+@professor_required
+def get_student_drilldown_api(student_id):
+    teacher_id = session.get('id')
+    course_id = request.args.get('course_id')
+    
+    if not course_id:
+        return jsonify({"message": "Course ID required"}), 400
+        
+    history = quiz_service.get_student_course_history(student_id, teacher_id, course_id)
+    return jsonify(history), 200
+
+@professor_bp.route('/attempts/<int:attempt_id>/override', methods=['PUT'])
+@professor_required
+def override_student_grade_api(attempt_id):
+    data = request.get_json()
+    new_score = data.get('new_score')
+    
+    if new_score is None:
+        return jsonify({"message": "New score is required"}), 400
+        
+    success = quiz_service.update_manual_grade(attempt_id, new_score)
+    if success:
+        return jsonify({"message": "Grade updated successfully"}), 200
+    return jsonify({"message": "Failed to update grade"}), 500

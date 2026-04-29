@@ -3,6 +3,10 @@ import { Routes, Route } from 'react-router-dom';
 import './App.css';
 import QuizResult from './pages/QuizResult';
 
+// ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
+import ProfessorLayout from './components/layout/ProfessorLayout';
+import StudentLayout from './components/layout/StudentLayout';
+
 // --- Components ---
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage'; 
@@ -19,10 +23,8 @@ import GenerateQuizPage from './pages/GenerateQuizPage';
 import QuizPreviewPage from './pages/QuizPreviewPage';
 import ProfessorResultsPage from './pages/ProfessorResultsPage';
 import ProfessorAnalyticsPage from './pages/ProfessorAnalyticsPage';
+import ManageStudentsPage from './pages/ManageStudentsPage';
 
-// ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
-import ProfessorLayout from './components/layout/ProfessorLayout';
-import StudentLayout from './components/layout/StudentLayout';
 
 function App() {
   // return <StudentDashboard />;
@@ -57,11 +59,9 @@ function App() {
           <Route path="results" element={<ResultsPage role="professor" />} />      
           <Route path="generate-quiz" element={<GenerateQuizPage />} />
           <Route path="/professor/analytics" element={<ProfessorAnalyticsPage />} />
-          
+          <Route path="students" element={<ManageStudentsPage />} />
           
           {/* You will need to create components for these new pages */}
-          <Route path="students" element={<h1>Manage Students Page</h1>} />
-          <Route path="analytics" element={<h1>Analytics Page</h1>} />
         </Route>
 
         <Route path="*" element={<h1>404: Page Not Found</h1>} />

@@ -1049,3 +1049,88 @@ def get_pending_students(quiz_id):
     finally:
         cursor.close()
         conn.close()
+
+
+# ❤️❤️❤️ --- Professor's Manage Students Page --- ❤️❤️❤️
+def get_professor_course_roster(teacher_id, course_id):
+    """Fetches all students in a specific course along with their average quiz score."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # The FIX: Added semester_course 'sc' join to strictly filter out students from other semesters
+        sql = """
+            SELECT 
+                s.id as student_id, 
+                s.enrollment_no, 
+                CONCAT(s.f_name, ' ', s.l_name) as student_name,
+                s.email,
+                ROUND(AVG(CASE WHEN qscd.course_id = tcd.course_id THEN qa.total_score ELSE NULL END), 2) as avg_score
+            FROM student s
+            JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
+            JOIN teacher_course_division tcd ON psdbs.division_id = tcd.division_id
+            JOIN semester_course sc ON psdbs.semester_id = sc.semester_id AND sc.course_id = tcd.course_id
+            LEFT JOIN student_quiz_attempt sqa ON s.id = sqa.student_id
+            LEFT JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id AND qa.attempt_status = 'submitted'
+            LEFT JOIN quizzes gq ON sqa.quiz_id = gq.id
+            LEFT JOIN quiz_semester_course_division qscd ON gq.id = qscd.quiz_id
+            WHERE tcd.teacher_id = %s AND tcd.course_id = %s
+            GROUP BY s.id, s.enrollment_no, student_name, s.email
+            ORDER BY s.enrollment_no ASC
+        """
+        cursor.execute(sql, (teacher_id, course_id))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching course roster: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_student_course_history(student_id, teacher_id, course_id):
+    """Fetches a specific student's quiz history for the drill-down modal."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                qa.attempt_id,
+                gq.quiz_title, 
+                gq.total_marks,
+                qa.total_score,
+                qa.attempt_status,
+                qa.submit_time
+            FROM student_quiz_attempt sqa
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN quizzes gq ON sqa.quiz_id = gq.id
+            JOIN quiz_semester_course_division qscd ON gq.id = qscd.quiz_id
+            WHERE sqa.student_id = %s 
+              AND gq.teacher_id = %s 
+              AND qscd.course_id = %s
+            ORDER BY qa.submit_time DESC
+        """
+        cursor.execute(sql, (student_id, teacher_id, course_id))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching student history: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_manual_grade(attempt_id, new_score):
+    """Allows a professor to manually override a quiz grade."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        sql = "UPDATE Quiz_Attempt SET total_score = %s WHERE attempt_id = %s"
+        cursor.execute(sql, (new_score, attempt_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating grade: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+#❤️❤️❤️ --- Manage Student  --- ❤️❤️❤️
