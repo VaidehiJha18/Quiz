@@ -93,12 +93,13 @@ export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token
 
 // Add this to your existing apiService.js file
 export const getAdminStats = async () => {
-    // Make sure this matches your Flask port (e.g., http://127.0.0.1:5000)
-    const response = await fetch('http://127.0.0.1:5000/api/admin/stats');
-    if (!response.ok) {
-        throw new Error('Failed to fetch admin stats');
+  const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
     }
-    return await response.json();
+  });
+  if (!response.ok) throw new Error("Failed to fetch statistics");
+  return await response.json();
 };
 //Priyanka
 // export const getAdminUsers = async () => {
@@ -109,12 +110,14 @@ export const getAdminStats = async () => {
 //   }
 //   return await response.json();
 // };
-export const getAdminUsers = async (search = '', school = 'All', branch = 'All', semester = 'All') => {
+export const getAdminUsers = async (searchTerm = '', school = 'All', branch = 'All', semester = 'All') => {
   try {
     // This 'params' object automatically turns into ?search=...&school=... in the URL
-    const response = await axios.get(`/api/admin/users`, {
-      params: { search, school, branch, semester }
-    });
+    const response = await fetch(`${API_BASE_URL}/admin/users?search=${searchTerm}&school=${school}&branch=${branch}&semester=${semester}`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    }
+  });
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : new Error("Failed to fetch admin users");
@@ -134,7 +137,7 @@ export const uploadAdminRoster = async (file) => {
   formData.append('file', file);
 
   // 2. Send it to the new Python route we just built
-  const response = await fetch('http://localhost:5000/api/admin/users/upload', {
+  const response = await fetch(`${API_BASE_URL}/admin/users/upload`, {
     method: 'POST',
     body: formData, // Notice we don't use JSON.stringify here!
   });

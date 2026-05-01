@@ -5,7 +5,7 @@ import os
 from .routes.auth import auth_bp
 from .routes.student import student_bp
 from backend.routes.professor import professor_bp 
-from routes.admin import admin_bp
+from backend.routes.admin import admin_bp
 
 FRONTEND_BUILD_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'build'
