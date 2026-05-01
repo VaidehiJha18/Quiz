@@ -3,7 +3,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 /**
  * useAntiCheat
  * Returns { FreezeOverlay } — render this at the TOP of your QuizPage JSX.
- * On 3rd violation: screen visually freezes + blurs, countdown shows, then auto-submits.
+ * On violation: screen visually freezes + blurs, countdown shows, then auto-submits.
  */
 export default function useAntiCheat(isActive, submitted, onViolation) {
   const violationCount = useRef(0);
@@ -30,16 +30,25 @@ export default function useAntiCheat(isActive, submitted, onViolation) {
     }, 1000);
   }, [isActive, submitted, isFrozen, onViolation]);
 
-  // 3-strike system
+  // // 3-strike system
+  // const handleViolation = useCallback((reason) => {
+  //   if (submitted || !isActive || isFrozen) return;
+  //   violationCount.current += 1;
+  //   if (violationCount.current >= 3) {
+  //     freezeAndSubmit(reason);
+  //   } else {
+  //     const left = 3 - violationCount.current;
+  //     alert(`Warning ${violationCount.current}/2: Stay on the quiz!\n${left} warning(s) left before auto-submit.`);
+  //   }
+  // }, [isActive, submitted, isFrozen, freezeAndSubmit]);
+
+  // Updated 1-strike system
   const handleViolation = useCallback((reason) => {
     if (submitted || !isActive || isFrozen) return;
-    violationCount.current += 1;
-    if (violationCount.current >= 3) {
-      freezeAndSubmit(reason);
-    } else {
-      const left = 3 - violationCount.current;
-      alert(`Warning ${violationCount.current}/2: Stay on the quiz!\n${left} warning(s) left before auto-submit.`);
-    }
+    
+    // Violation occurs: go straight to freeze
+    freezeAndSubmit(reason);
+    
   }, [isActive, submitted, isFrozen, freezeAndSubmit]);
 
   // 1. Block right-click
