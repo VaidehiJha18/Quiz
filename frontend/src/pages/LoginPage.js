@@ -51,11 +51,24 @@ export default function LoginPage() {
 
     localStorage.setItem('userRole', userRole);
 
+    // setTimeout(() => {
+    //     if (userRole === 'professor') {
+    //         navigate('/professor/dashboard');
+    //     } else if (userRole === 'student') {
+    //         navigate('/student/dashboard');
+    //     } else {
+    //         console.error("Role mismatch or undefined:", userRole);
+    //         // Optional: Show error to user instead of silent fail
+    //         setMessage({ type: 'error', text: "Login successful, but role unknown." });
+    //     }
+    // }, 1500);
     setTimeout(() => {
         if (userRole === 'professor') {
             navigate('/professor/dashboard');
         } else if (userRole === 'student') {
             navigate('/student/dashboard');
+        } else if (userRole === 'admin') {  // 👈 ADD THIS CONDITION
+            navigate('/admin/dashboard'); 
         } else {
             console.error("Role mismatch or undefined:", userRole);
             // Optional: Show error to user instead of silent fail

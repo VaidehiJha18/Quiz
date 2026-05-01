@@ -34,16 +34,40 @@ class AuthService:
             raise ValueError("Invalid university email format")
         return self.ROLE_MAPPING[role_name]
 
+    # def _validate_master_account(self, email, role_name, cursor):
+    #     """Checks if the email exists in the respective master table and returns the master ID."""
+    #     if role_name == 'professor' or role_name == 'admin':
+    #         master_table = 'employee'
+    #         id_column = 'id' #  Assuming your employee table uses 'id' as primary key
+    #     elif role_name == 'student':
+    #         master_table = 'student'
+    #         id_column = 'id' #  Assuming your student table uses 'id' as primary key
+    #     else:
+    #         return None # Fallback for unknown roles
+
+    #     sql = f"SELECT {id_column} AS master_id FROM {master_table} WHERE email=%s"
+    #     cursor.execute(sql, (email,))
+    #     master_record = cursor.fetchone()
+        
+    #     if not master_record:
+    #         raise ValueError(f"Email not found in the {master_table} database. Cannot register.")
+            
+    #     return master_record['master_id']
+    #Priyanka
     def _validate_master_account(self, email, role_name, cursor):
         """Checks if the email exists in the respective master table and returns the master ID."""
-        if role_name == 'professor' or role_name == 'admin':
+        
+        if role_name == 'admin':
+            return None  # Admins do not need an employee record!
+
+        if role_name == 'professor':
             master_table = 'employee'
-            id_column = 'id' # ⚠️ Assuming your employee table uses 'id' as primary key
+            id_column = 'id' #  Assuming your employee table uses 'id' as primary key
         elif role_name == 'student':
             master_table = 'student'
-            id_column = 'id' # ⚠️ Assuming your student table uses 'id' as primary key
+            id_column = 'id' #  Assuming your student table uses 'id' as primary key
         else:
-            return None # Fallback for unknown roles
+            return None 
 
         sql = f"SELECT {id_column} AS master_id FROM {master_table} WHERE email=%s"
         cursor.execute(sql, (email,))
@@ -167,20 +191,18 @@ class AuthService:
             stored_hash = user_record.pop('password_hash')
             db_role_id = int(user_record.pop('role_id'))
             role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
-
-            # ✅ 1. Define role_name FIRST before printing it!
             role_name = role_name_map.get(db_role_id, 'unknown')
-            
-            # ✅ 2. Now it is safe to print
             print(f"DEBUG: Session Load - User ID: {user_id}, DB Role ID: {db_role_id} -> Mapped Role: {role_name}")
             
-            # ✅ 3. Assign the rest of the variables
-            
-            user_record['role'] = role_name_map.get(db_role_id, 'unknown')
+            # user_record['role'] = role_name_map.get(db_role_id, 'unknown')
+            # user_record['username'] = user_record.pop('user_name')
+            # user_record['password_hash'] = stored_hash
+
+            # role_name = user_record['role']
+            #Priyanka
+            user_record['role'] = role_name
             user_record['username'] = user_record.pop('user_name')
             user_record['password_hash'] = stored_hash
-
-            role_name = user_record['role']
             master_id = self._validate_master_account(user_record['email'], role_name, cursor)
             user_record['master_id'] = master_id
 

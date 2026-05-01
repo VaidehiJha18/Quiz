@@ -1,7 +1,10 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+// import { Routes, Route } from 'react-router-dom';
 import './App.css';
 import QuizResult from './pages/QuizResult';
+import AdminManageUsersPage from './pages/AdminManageUsersPage';
+import AdminRoute from './components/layout/AdminRoute';
+import AdminSystemSetupPage from './pages/AdminSystemSetupPage';
 
 // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
 import ProfessorLayout from './components/layout/ProfessorLayout';
@@ -24,6 +27,9 @@ import QuizPreviewPage from './pages/QuizPreviewPage';
 import ProfessorResultsPage from './pages/ProfessorResultsPage';
 import ProfessorAnalyticsPage from './pages/ProfessorAnalyticsPage';
 import ManageStudentsPage from './pages/ManageStudentsPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 
 
 function App() {
@@ -61,11 +67,42 @@ function App() {
           <Route path="/professor/analytics" element={<ProfessorAnalyticsPage />} />
           <Route path="students" element={<ManageStudentsPage />} />
           
+          
           {/* You will need to create components for these new pages */}
         </Route>
 
         <Route path="*" element={<h1>404: Page Not Found</h1>} />
+        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+        <Route path="/admin/users" element={<AdminManageUsersPage />} />
+        <Route path="*" element={<h1>404: Page Not Found</h1>} />
+        {/* --- Admin Routes (NOW SECURED) --- */}
+        <Route 
+          path="/admin/dashboard" 
+          element={
+            <AdminRoute>
+              <AdminDashboardPage />
+            </AdminRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/users" 
+          element={
+            <AdminRoute>
+              <AdminManageUsersPage />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/setup" 
+          element={
+            <AdminRoute>
+              <AdminSystemSetupPage />
+            </AdminRoute>
+          } 
+        />
       </Routes>
+
     </div>
   );
 }
