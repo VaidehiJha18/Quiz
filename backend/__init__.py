@@ -12,9 +12,11 @@ def create_app(config_class=Config):
 
     # Register Blueprints
     from .routes.auth import auth_bp
+    from .routes.admin import admin_bp
     from .routes.professor import professor_bp
     from .routes.student import student_bp
     app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
     app.register_blueprint(professor_bp, url_prefix='/prof')
     app.register_blueprint(student_bp, url_prefix='/student')
 

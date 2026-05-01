@@ -80,3 +80,78 @@ export const fetchStudentResults = () => api.get('/student/results');
 // 17. Fetch Quiz Questions for Taking Quiz
 export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token}`);
 
+// Add this to your existing apiService.js file
+export const getAdminStats = async () => {
+    // Make sure this matches your Flask port (e.g., http://127.0.0.1:5000)
+    const response = await fetch('http://127.0.0.1:5000/api/admin/stats');
+    if (!response.ok) {
+        throw new Error('Failed to fetch admin stats');
+    }
+    return await response.json();
+};
+//Priyanka
+// export const getAdminUsers = async () => {
+//   // Replace with your actual Axios or fetch logic depending on what you use
+//   const response = await fetch('http://localhost:5000/api/admin/users');
+//   if (!response.ok) {
+//     throw new Error('Failed to fetch admin users');
+//   }
+//   return await response.json();
+// };
+export const getAdminUsers = async (search = '', school = 'All', branch = 'All', semester = 'All') => {
+  try {
+    // This 'params' object automatically turns into ?search=...&school=... in the URL
+    const response = await axios.get(`/api/admin/users`, {
+      params: { search, school, branch, semester }
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Failed to fetch admin users");
+  }
+};
+export const getAdminUserDetails = async (userId) => {
+  const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch user details');
+  }
+  return await response.json();
+};
+//Priyanka
+export const uploadAdminRoster = async (file) => {
+  // 1. Wrap the file in a FormData envelope
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // 2. Send it to the new Python route we just built
+  const response = await fetch('http://localhost:5000/api/admin/users/upload', {
+    method: 'POST',
+    body: formData, // Notice we don't use JSON.stringify here!
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to upload roster');
+  }
+  
+  return await response.json();
+};
+// --- ADMIN: DELETE USER ---
+export const deleteAdminUser = async (userId) => {
+  try {
+    const response = await api.delete(`/api/admin/users/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    throw error;
+  }
+};
+// --- ADMIN: UPDATE USER ---
+export const updateAdminUser = async (userId, userData) => {
+  try {
+    const response = await api.put(`/api/admin/users/${userId}`, userData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating user:", error);
+    throw error;
+  }
+};

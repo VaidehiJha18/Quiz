@@ -5,6 +5,7 @@ import os
 from .routes.auth import auth_bp
 from .routes.student import student_bp
 from backend.routes.professor import professor_bp 
+from routes.admin import admin_bp
 
 FRONTEND_BUILD_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'build'
@@ -52,6 +53,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(professor_bp, url_prefix='/prof')
     app.register_blueprint(student_bp, url_prefix='/student')
+    app.register_blueprint(admin_bp)
     
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
