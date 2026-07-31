@@ -189,6 +189,7 @@ export default function ViewQuestionsPage() {
               <thead>
                 <tr style={styles.tableHeaderRow}>
                   <th style={styles.th}>ID</th>
+                  <th style={styles.th}>Unit</th> {/* ✅ ADDED HERE ❤️❤️❤️*/}
                   <th style={styles.th}>Question</th>
                   <th style={styles.th}>Option 1</th>
                   <th style={styles.th}>Option 2</th>
@@ -203,6 +204,7 @@ export default function ViewQuestionsPage() {
                   questions.map((q) => (
                     <tr key={q.question_id} style={styles.tableRow}>
                       <td style={styles.td}>{q.question_id}</td>
+                      <td style={{...styles.td, fontWeight: 'bold', color: '#667eea'}}>Unit {q.unit || 1}</td> {/*❤️❤️❤️ ✅ ADDED HERE */}
                       <td style={styles.td}>{q.question_txt}</td>
                       <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
                       <td style={styles.td}>{q.options?.[1]?.option_text || '-'}</td>

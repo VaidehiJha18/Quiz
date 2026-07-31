@@ -35,3 +35,6 @@ flask-cors
 flask-wtf
 gunicorn
 pymysql
+pandas
+openpyxl
+flask-excel

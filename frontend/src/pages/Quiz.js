@@ -268,7 +268,13 @@ const Quiz = () => {
   // Submit handler — defined before useAntiCheat so it can be passed in
   const handleSubmit = useCallback(async (autoSubmitted = false, reason = '') => {
     if (submitted || isSubmitting || !quizData) return;
-    if (!autoSubmitted && !window.confirm("Are you sure you want to submit?")) return;
+
+    // ✅ NEW: Alert the user immediately if time is up before confirming submission
+    if (reason === 'time_up') {
+        alert("⏳ Time's Up! Your quiz is being automatically submitted. Your answers have been saved.");
+    } else if (!autoSubmitted && !window.confirm("Are you sure you want to submit?")) {
+        return;
+    }
 
     setIsSubmitting(true);
     setSubmitted(true);
@@ -299,10 +305,15 @@ const Quiz = () => {
       };
 
       await submitStudentQuiz(payload);
-      alert(autoSubmitted
-        ? "⚠️ Your quiz was auto-submitted due to a policy violation."
-        : "✅ Quiz Submitted Successfully!"
-      );
+      // ✅ NEW: Show specific alerts based on HOW it was submitted
+      if (reason === 'time_up') {
+          // Do nothing here, we already alerted them at the start of the function
+      } else if (autoSubmitted) {
+          alert("⚠️ Your quiz was auto-submitted due to a policy violation.");
+      } else {
+          alert("✅ Quiz Submitted Successfully!");
+      }
+      
       navigate('/student/dashboard');
 
     } catch (err) {

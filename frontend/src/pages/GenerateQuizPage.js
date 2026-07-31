@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  fetchSchools, fetchPrograms, fetchDepartments, fetchCourses, generateQuiz, fetchCourseStats 
+  fetchSchools, fetchPrograms, fetchDepartments, fetchCourses, fetchCourseStats, 
+  api // ✅ Added 'api' here so we can send the custom payload with units
 } from '../api/apiService'; 
 import Button from '../components/forms/Button';
 import Dropdown from '../components/layout/Dropdown';
@@ -25,8 +26,13 @@ export default function GenerateQuizPage() {
     courses: []
   });
 
+  // ✅ 1. NEW STATE FOR UNITS
+  const [selectedUnits, setSelectedUnits] = useState([]);
+  const availableUnits = [1, 2, 3, 4, 5];
+
   const [generatedLink, setGeneratedLink] = useState('');
   const [loading, setLoading] = useState(false);
+  const [courseStats, setCourseStats] = useState(null);
 
   // 1. Load School on Mount
   useEffect(() => {
@@ -78,11 +84,10 @@ export default function GenerateQuizPage() {
     }
   };
 
-  const [courseStats, setCourseStats] = useState(null);
-
   const handleCourseChange = async (e) => {
     const course = e.target.value;
     setSelections({ ...selections, course });
+    setSelectedUnits([]); // ✅ Reset units when course changes
 
     if (!course) {
       setCourseStats(null);
@@ -98,17 +103,28 @@ export default function GenerateQuizPage() {
     }
   };
 
-  // --- GENERATE QUIZ LOGIC ---❤️❤️❤️❤️❤️
- // src/pages/GenerateQuizPage.js
-const handleGenerateQuiz = async () => {
+  // ✅ 2. UNIT TOGGLE HANDLER
+  const handleUnitToggle = (unitNumber) => {
+      setSelectedUnits(prev => 
+          prev.includes(unitNumber) 
+              ? prev.filter(u => u !== unitNumber) 
+              : [...prev, unitNumber]
+      );
+  };
+
+  // --- GENERATE QUIZ LOGIC ---
+  const handleGenerateQuiz = async () => {
     if (!selections.course) {
         alert("Please select a course first.");
         return;
     }
     setLoading(true);
     try {
-        // 🚀 Use the centralized API instance instead of manual fetch
-        const res = await generateQuiz(selections.course);
+        // ✅ 3. USE API.POST TO SEND THE SELECTED UNITS ARRAY
+        const res = await api.post('/prof/generate', { 
+            course_id: selections.course, 
+            units: selectedUnits 
+        });
 
         if (res.status === 201) {
             setGeneratedLink(res.data.quiz_link);
@@ -125,14 +141,14 @@ const handleGenerateQuiz = async () => {
             alert("Session expired. Please log in again.");
         } else {
             console.error("Generation failed:", error);
-            alert("Failed to generate quiz. Ensure questions exist for this course.");
+            alert("Failed to generate quiz. Ensure questions exist for this course and selected units.");
         }
     } finally {
         setLoading(false);
     }
-};
+  };
 
-const filterHandlers = {
+  const filterHandlers = {
     handleSchoolChange,
     handleDeptChange,
     handleProgramChange,
@@ -163,13 +179,34 @@ const filterHandlers = {
         handlers={filterHandlers}
       />
 
-        {/* Generate Button */}
+        {/* Course Stats */}
         {courseStats && (
           <div style={{ marginTop: '16px', textAlign: 'center', color: '#333' }}>
             <strong>Course Questions:</strong> {courseStats.total_for_course || 0} • <strong>Your Questions:</strong> {courseStats.teacher_for_course || 0}
           </div>
         )}
 
+        {/* ✅ 4. UNIT CHECKBOXES (Only show if a course is selected) */}
+        {selections.course && (
+          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: '8px' }}>
+            <p style={{ fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>Select Units to Include (Leave blank for full syllabus):</p>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {availableUnits.map(unit => (
+                  <label key={unit} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#333', fontWeight: '500' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedUnits.includes(unit)} 
+                      onChange={() => handleUnitToggle(unit)} 
+                      style={{ marginRight: '8px', cursor: 'pointer' }}
+                    />
+                    Unit {unit}
+                  </label>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Generate Button */}
         <div style={{marginTop: '30px', textAlign: 'center'}}>
             <Button 
                 label={loading ? "Generating..." : "Generate Quiz"} 

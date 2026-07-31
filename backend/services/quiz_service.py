@@ -43,7 +43,7 @@ def insert_question(form_data, teacher_id):
     cursor = conn.cursor()
 
     DEFAULT_TYPE = "MCQ"
-    DEFAULT_UNIT = 1
+    unit_value = int(form_data.get('unit', 1)) # ✅ Grabs the unit from frontend ❤️❤️❤️
     DEFAULT_MARKS = int(form_data.get('marks', 1))
 
     course_id = form_data.get('course_id')
@@ -59,7 +59,7 @@ def insert_question(form_data, teacher_id):
         cursor.execute(sql_insert_question, (
             form_data['text'], 
             DEFAULT_TYPE,  
-            DEFAULT_UNIT,  
+            unit_value,  # ✅ Pass the dynamic unit here
             DEFAULT_MARKS,
         ))
         new_question_id = cursor.lastrowid
@@ -184,7 +184,7 @@ def update_question(question_id, data):
     
     # 1. Update the question text in question_bank
     sql_update_question = """
-        UPDATE question_bank SET question_txt = %s WHERE id = %s
+        UPDATE question_bank SET question_txt = %s, unit = %s WHERE id = %s
     """
     
     # 2. Delete existing answers/options from answer_map
@@ -211,7 +211,8 @@ def update_question(question_id, data):
         conn.begin()
         
         # --- Update Question Bank ---
-        cursor.execute(sql_update_question, (data['text'], question_id))
+        unit_value = int(data.get('unit', 1))
+        cursor.execute(sql_update_question, (data['text'], unit_value, question_id))
 
         # --- Delete Old Options ---
         cursor.execute(sql_delete_options, (question_id,))
@@ -264,6 +265,7 @@ def fetch_questions_by_course(course_id):
             SELECT 
                 qb.id AS question_id,
                 qb.question_txt,
+                qb.unit,  # ❤️❤️❤️
                 am.option_text,
                 am.is_correct
             FROM question_bank qb
@@ -282,6 +284,7 @@ def fetch_questions_by_course(course_id):
                 questions[q_id] = {
                     'question_id': q_id,
                     'question_txt': row['question_txt'],
+                    'unit': row['unit'], # ✅ Map the unit❤️❤️❤️
                     'options': []
                 }
             questions[q_id]['options'].append({
@@ -327,7 +330,7 @@ def delete_question(question_id):
         conn.close()
 
 # 8. Generate and Save Quiz ❤️❤️❤️❤️❤️
-def generate_and_save_quiz(teacher_id, course_id, teacher_name):
+def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=None): # ✅ Added parameter
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -351,6 +354,29 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name):
         
         cursor.execute(sql_context, (course_id))
         meta = cursor.fetchone()
+
+        # ✅ NEW LOGIC: Filter by units if the professor selected them ❤️❤️❤️❤️❤️
+        if selected_units and len(selected_units) > 0:
+            placeholders = ', '.join(['%s'] * len(selected_units))
+            query_q = f"""
+                SELECT qb.id FROM question_bank qb
+                JOIN question_employee qe ON qb.id = qe.question_id
+                JOIN question_course qc ON qb.id = qc.question_id
+                WHERE qe.employee_id = %s AND qc.course_id = %s AND qb.unit IN ({placeholders})
+                ORDER BY RAND() LIMIT 10
+            """
+            params = [teacher_id, course_id] + selected_units
+            cursor.execute(query_q, tuple(params))
+        else:
+            # Fallback: Just grab random questions from the course if no units selected
+            query_q = """
+                SELECT qb.id FROM question_bank qb
+                JOIN question_employee qe ON qb.id = qe.question_id
+                JOIN question_course qc ON qb.id = qc.question_id
+                WHERE qe.employee_id = %s AND qc.course_id = %s
+                ORDER BY RAND() LIMIT 10
+            """
+            cursor.execute(query_q, (teacher_id, course_id))
 
         school_name = meta['school_name'] if meta else "N/A"
         dept_name = meta['dept_name'] if meta else "N/A"
@@ -529,6 +555,7 @@ def get_question_by_id(question_id):
             SELECT 
                 qb.id AS question_id,
                 qb.question_txt, 
+                qb.unit,      # ❤️❤️❤️
                 am.option_text,
                 am.is_correct,
                 qc.course_id
@@ -543,7 +570,8 @@ def get_question_by_id(question_id):
         if not results:
             return None # Question not found
         question_data = {
-            'text': results[0]['question_txt'], 
+            'text': results[0]['question_txt'],
+            'unit': results[0]['unit'], # ❤️❤️❤️
             'options': [],
             'correct': '', # Will hold the index (0, 1, 2, 3) as a string
             'course_id': results[0].get('course_id') if results[0].get('course_id') else ''
@@ -598,7 +626,7 @@ def get_divisions_for_publish(teacher_id, course_id):
         conn.close()
 
 # Add this function to handle the Publish logic
-def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
     """Updates quiz status and links it to specific divisions."""
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -606,10 +634,10 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids):
         # 1. Update Quiz Metadata (Time Limit & Status)
         update_quiz_sql = """
             UPDATE quizzes 
-            SET time_limit = %s, quiz_status = 'Published' 
+            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s 
             WHERE id = %s
         """
-        cursor.execute(update_quiz_sql, (time_limit, quiz_id))
+        cursor.execute(update_quiz_sql, (time_limit, quiz_title, quiz_id))
 
         # 2. Get Course and Semester info from the quiz to ensure consistency
         get_ids_sql = """
@@ -979,14 +1007,130 @@ def publish_quiz_results(attempt_ids):
         cursor.close()
         conn.close()
 
+# --- Delete a Student's Attempt ---❤️❤️❤️
+def delete_quiz_attempt(attempt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Delete the detailed responses first (Foreign Key dependency)
+        cursor.execute("DELETE FROM attempt_response WHERE attempt_id = %s", (attempt_id,))
+        # Delete the link between student and attempt
+        cursor.execute("DELETE FROM student_quiz_attempt WHERE attempt_id = %s", (attempt_id,))
+        # Delete the attempt record itself
+        cursor.execute("DELETE FROM quiz_attempt WHERE attempt_id = %s", (attempt_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Error deleting attempt: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
 
-# ==============================================================================================
-# if __name__ == "__main__":
-#     app = create_app()
-#     with app.app_context():
-#         # 🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬🥬
-#         # Testing get_quiz_for_student
-#         test_token = "fac0a6d4-71b"
-#         print(get_quiz_for_student(test_token))
-#         # De-comment --> #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
-#         #command to run ('python -m backend.services.quiz_service)
+# --- Find Students Who Haven't Taken the Quiz ---❤️❤️❤️
+def get_pending_students(quiz_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # This clever query finds all students in the course's semester, 
+        # and subtracts the ones who already have an attempt recorded!
+        sql = """
+            SELECT s.f_name, s.l_name, s.enrollment_no, s.email
+            FROM student s
+            JOIN student_academic_info sai ON s.id = sai.student_id
+            JOIN quizzes q ON q.id = %s
+            JOIN semester_course sc ON q.course_id = sc.course_id AND sai.semester_id = sc.semester_id
+            LEFT JOIN student_quiz_attempt sqa ON s.id = sqa.student_id AND sqa.quiz_id = q.id
+            WHERE sqa.attempt_id IS NULL
+        """
+        cursor.execute(sql, (quiz_id,))
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ❤️❤️❤️ --- Professor's Manage Students Page --- ❤️❤️❤️
+def get_professor_course_roster(teacher_id, course_id):
+    """Fetches all students in a specific course along with their average quiz score."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # The FIX: Added semester_course 'sc' join to strictly filter out students from other semesters
+        sql = """
+            SELECT 
+                s.id as student_id, 
+                s.enrollment_no, 
+                CONCAT(s.f_name, ' ', s.l_name) as student_name,
+                s.email,
+                ROUND(AVG(CASE WHEN qscd.course_id = tcd.course_id THEN qa.total_score ELSE NULL END), 2) as avg_score
+            FROM student s
+            JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
+            JOIN teacher_course_division tcd ON psdbs.division_id = tcd.division_id
+            JOIN semester_course sc ON psdbs.semester_id = sc.semester_id AND sc.course_id = tcd.course_id
+            LEFT JOIN student_quiz_attempt sqa ON s.id = sqa.student_id
+            LEFT JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id AND qa.attempt_status = 'submitted'
+            LEFT JOIN quizzes gq ON sqa.quiz_id = gq.id
+            LEFT JOIN quiz_semester_course_division qscd ON gq.id = qscd.quiz_id
+            WHERE tcd.teacher_id = %s AND tcd.course_id = %s
+            GROUP BY s.id, s.enrollment_no, student_name, s.email
+            ORDER BY s.enrollment_no ASC
+        """
+        cursor.execute(sql, (teacher_id, course_id))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching course roster: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_student_course_history(student_id, teacher_id, course_id):
+    """Fetches a specific student's quiz history for the drill-down modal."""
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                qa.attempt_id,
+                gq.quiz_title, 
+                gq.total_marks,
+                qa.total_score,
+                qa.attempt_status,
+                qa.submit_time
+            FROM student_quiz_attempt sqa
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN quizzes gq ON sqa.quiz_id = gq.id
+            JOIN quiz_semester_course_division qscd ON gq.id = qscd.quiz_id
+            WHERE sqa.student_id = %s 
+              AND gq.teacher_id = %s 
+              AND qscd.course_id = %s
+            ORDER BY qa.submit_time DESC
+        """
+        cursor.execute(sql, (student_id, teacher_id, course_id))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching student history: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_manual_grade(attempt_id, new_score):
+    """Allows a professor to manually override a quiz grade."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        sql = "UPDATE Quiz_Attempt SET total_score = %s WHERE attempt_id = %s"
+        cursor.execute(sql, (new_score, attempt_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating grade: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+#❤️❤️❤️ --- Manage Student  --- ❤️❤️❤️

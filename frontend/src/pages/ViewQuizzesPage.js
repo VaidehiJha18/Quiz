@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchQuizzes, deleteQuiz, fetchDivisions, publishQuiz } from '../api/apiService';
 
 export default function ViewQuizzesPage() {
+  const navigate = useNavigate();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,6 +15,7 @@ export default function ViewQuizzesPage() {
   const [selectedDivision, setSelectedDivision] = useState('');
   const [timeLimit, setTimeLimit] = useState(30);
   const [publishing, setPublishing] = useState(false);
+  const [publishTitle, setPublishTitle] = useState(''); // ✅ State is here
 
   useEffect(() => {
     loadQuizzes();
@@ -54,12 +57,16 @@ export default function ViewQuizzesPage() {
         alert("Error: This quiz has no token.");
         return;
     }
-    window.location.href = `/take-quiz/${token}`;
+    navigate(`/professor/preview/${token}`);
   };
 
-  // --- Publish Handlers ---  ❤️❤️❤️❤️❤️
+  // --- Publish Handlers --- 
   const handlePublishClick = async (quiz) => {
     setSelectedQuiz(quiz);
+    
+    // ✅ Pre-fill the current quiz name when modal opens
+    setPublishTitle(quiz.quiz_title || quiz.title || ''); 
+    
     setAvailableDivisions([]); // Reset
     setSelectedDivision('');
     setTimeLimit(quiz.duration || 10); // Default to existing duration or 10
@@ -67,7 +74,6 @@ export default function ViewQuizzesPage() {
 
     // Fetch valid divisions for this specific course & teacher
     try {
-        // Note: Ensure your quiz object has course_id. 
         if(quiz.course_id || quiz.course) {
             const res = await fetchDivisions(quiz.course_id); 
             setAvailableDivisions(res.data || []);
@@ -83,12 +89,18 @@ export default function ViewQuizzesPage() {
         alert("Please select a division.");
         return;
     }
+    // ✅ Make sure the professor didn't leave the title blank
+    if (!publishTitle.trim()) {
+        alert("Please enter a Quiz Name/Title.");
+        return;
+    }
 
     setPublishing(true);
     try {
         await publishQuiz(selectedQuiz.id, {
             time_limit: parseInt(timeLimit),
-            division_ids: [parseInt(selectedDivision)] 
+            division_ids: [parseInt(selectedDivision)],
+            quiz_title: publishTitle // ✅ Send the custom name to the backend!
         });
         
         alert("Quiz Published Successfully!");
@@ -100,7 +112,7 @@ export default function ViewQuizzesPage() {
     } finally {
         setPublishing(false);
     }
-  };   // ❤️❤️❤️❤️❤️
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -277,13 +289,33 @@ export default function ViewQuizzesPage() {
 
                     <hr style={{margin:'20px 0', border:'0', borderTop:'1px solid #eee'}}/>
 
+                    {/* ✅ NEW: Quiz Title Input Box Drawn Here */}
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#1e293b' }}>
+                            Quiz Name / Title
+                        </label>
+                        <input 
+                            type="text" 
+                            value={publishTitle}
+                            onChange={(e) => setPublishTitle(e.target.value)}
+                            placeholder="e.g., Midterm Exam: Unit 1"
+                            style={{ 
+                                width: '100%', 
+                                padding: '8px', 
+                                borderRadius: '4px', 
+                                border: '1px solid #ccc',
+                                boxSizing: 'border-box'
+                            }}
+                        />
+                    </div>
+
                     <div style={{marginBottom:'15px'}}>
                         <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Time Limit (Minutes)</label>
                         <input 
                             type="number" 
                             value={timeLimit} 
                             onChange={(e) => setTimeLimit(e.target.value)}
-                            style={{width:'100%', padding:'8px', borderRadius:'4px', border:'1px solid #ccc'}}
+                            style={{width:'100%', padding:'8px', borderRadius:'4px', border:'1px solid #ccc', boxSizing: 'border-box'}}
                         />
                     </div>
 
@@ -292,7 +324,7 @@ export default function ViewQuizzesPage() {
                         <select 
                             value={selectedDivision} 
                             onChange={(e) => setSelectedDivision(e.target.value)}
-                            style={{width:'100%', padding:'8px', borderRadius:'4px', border:'1px solid #ccc'}}
+                            style={{width:'100%', padding:'8px', borderRadius:'4px', border:'1px solid #ccc', boxSizing: 'border-box'}}
                         >
                             <option value="">-- Select Division --</option>
                             {availableDivisions.length > 0 ? (

@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from ..services.auth_service import AuthService
+from ..extensions import get_db_connection
+import pymysql
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -77,10 +79,27 @@ def get_profile():
         
         user_details = auth_service.get_user_by_id(user_id)
         if user_details:
+            role = getattr(user_details, 'role', 'student')
+            enrollment_no = None
+            
+            # ✅ NEW: Fetch enrollment number from the student table
+            if role == 'student':
+                conn = get_db_connection()
+                cursor = conn.cursor(pymysql.cursors.DictCursor)
+                try:
+                    cursor.execute("SELECT enrollment_no FROM student WHERE id=%s", (user_details.master_id,))
+                    stu_record = cursor.fetchone()
+                    if stu_record:
+                        enrollment_no = stu_record.get('enrollment_no')
+                finally:
+                    cursor.close()
+                    conn.close()
+
             return jsonify({
                 "user_id": user_details.master_id, 
                 "username": user_details.username,
                 "email": user_details.email,
+                "enrollment_no": enrollment_no, # ❤️❤️❤️❤️
                 "role": getattr(user_details, 'role', 'student'),
                 "message": "User profile data retrieved."
             }), 200

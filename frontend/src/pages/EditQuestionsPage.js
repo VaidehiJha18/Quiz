@@ -18,7 +18,8 @@ export default function EditQuestionPage({ isNew }) {
     text: '', 
     options: ['', '', '', ''], 
     correct: '',
-    course_id: ''    //  ❤️❤️❤️❤️❤️
+    course_id: '',
+    unit: 1    //  ❤️❤️❤️❤️❤️
   });
 
   const [courses, setCourses] = useState([]); // 👈 Store courses list ❤️❤️❤️❤️❤️
@@ -50,7 +51,8 @@ export default function EditQuestionPage({ isNew }) {
                 text: q.text,
                 options: loadedOptions,
                 correct: q.correct,
-                course_id: q.course_id || '' // Load saved course if available
+                course_id: q.course_id || '', // Load saved course if available
+                unit: q.unit || 1, // Load saved unit if available❤️❤️❤️
             });
         }
         } catch (err) {
@@ -105,7 +107,7 @@ export default function EditQuestionPage({ isNew }) {
         correct_index: formData.correct, 
         course_id: formData.course_id,    //  ❤️❤️❤️❤️❤️
         question_type: 'MCQ',
-        unit: 1, 
+        unit: formData.unit, // ✅ Use the dynamic unit from state❤️❤️❤️ 
         marks: 1, 
     };
 
@@ -141,7 +143,7 @@ export default function EditQuestionPage({ isNew }) {
             {isNew ? 'Add New Question' : 'Edit Question'}
           </h2>
 
-          {/* ✅ 1. COURSE SELECTION DROPDOWN   ❤️❤️❤️❤️*/}
+          {/* ✅ 1. COURSE SELECTION DROPDOWN */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
               Select Course
@@ -166,6 +168,22 @@ export default function EditQuestionPage({ isNew }) {
               ))}
             </select>
           </div>       
+
+          {/* ✅ 2. UNIT SELECTION DROPDOWN */}
+          <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Select Unit
+              </label>
+              <select 
+                  value={formData.unit} 
+                  onChange={(e) => setFormData({ ...formData, unit: parseInt(e.target.value) })}
+                  style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#fff' }}
+              >
+                  {[1, 2, 3, 4, 5].map(u => (
+                      <option key={u} value={u}>Unit {u}</option>
+                  ))}
+              </select>
+          </div>
 
           {/* Question Text */}
           <FormInput 

@@ -20,7 +20,8 @@ body {
 /* Dashboard Layout */
 .student-dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fda085 100%);
 }
 
@@ -37,8 +38,8 @@ body {
 
 .university-header {
   text-align: center;
-  margin-bottom: 3rem;
-  padding: 2rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
   border: 2px dashed rgba(255, 255, 255, 0.3);
   border-radius: 12px;
 }
@@ -117,8 +118,9 @@ body {
 /* Main Content */
 .student-main-content {
   flex: 1;
-  padding: 2.5rem 3rem;
-  overflow-y: auto;
+  padding: 1.5rem 1rem;
+  overflow-y: visible !important;
+  height: auto !important;
 }
 
 /* Top Bar */
@@ -137,6 +139,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;   /* ❤️❤️❤️*/
+  gap: 15px; /* ❤️❤️❤️*/
 }
 
 .page-title-section h1 {
@@ -255,7 +259,7 @@ body {
 
 .quiz-card-details {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -354,13 +358,17 @@ body {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width:1024px) {
   .student-dashboard-layout {
     flex-direction: column;
+    height: auto !important;
+    overflow-y: auto !important;
   }
 
   .student-sidebar {
     width: 100%;
+    height: auto !important;
+    padding: 1.5rem;
   }
 
   .quiz-card-details {
@@ -408,10 +416,12 @@ const StudentDashboard = () => {
     const loadProfile = async () => {
       try {
         const res = await fetchStudentProfile(); 
-        if (res.data && res.data.name) {
-             setStudentData(res.data);
-        } else if (res.data && res.data.f_name) {
-             setStudentData({ ...res.data, name: res.data.f_name });
+        console.log("DEBUG: Data from backend ->", res.data);
+        if (res.data) {
+             setStudentData({ 
+                 ...res.data, 
+                 name: res.data.username || res.data.name || res.data.f_name || 'Student'
+             });
         }
       } catch (err) {
         console.error("Error loading profile:", err);
@@ -532,8 +542,14 @@ const StudentDashboard = () => {
                 {studentData.name ? studentData.name.charAt(0) : 'S'}
               </div>
               <div className="profile-info">
-                <div className="profile-name">{studentData.name}</div>
-                <div className="profile-id">ID: {studentData.id}</div>
+              <div className="profile-name">{studentData.name || studentData.username}</div>
+              <div className="profile-id">
+                 ID: {
+                    studentData.enrollment_no 
+                    ? String(studentData.enrollment_no).slice(-4) 
+                    : (studentData.user_id || studentData.id || 'N/A')
+                  }
+              </div>
               </div>
             </div>
           </div>

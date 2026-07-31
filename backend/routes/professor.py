@@ -340,10 +340,11 @@ def generate_quiz_api():
         teacher_id = session.get('id')
         teacher_name = session.get('username', 'Professor')
         data = request.get_json()
-        course_id = data.get('course_id') 
+        course_id = data.get('course_id')
+        selected_units = data.get('units', []) # ✅ Extract selected units array❤️❤️❤️❤️ 
         if not teacher_id:
             return jsonify({"message": "User ID not found"}), 400    
-        quiz_data = quiz_service.generate_and_save_quiz(teacher_id, course_id, teacher_name)
+        quiz_data = quiz_service.generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units)
         if not quiz_data:
             return jsonify({"message": "No questions found for this course."}), 404
         response_payload = {
@@ -440,11 +441,13 @@ def publish_quiz_api(quiz_id):
     time_limit = data.get('time_limit')
     division_ids = data.get('division_ids') # Array of IDs, e.g., [1, 2]
 
-    if not time_limit or not division_ids:
-        return jsonify({"message": "Missing time limit or divisions"}), 400
+    quiz_title = data.get('quiz_title')
 
-    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids)
-    
+    if not time_limit or not division_ids or not quiz_title:
+        return jsonify({"message": "Missing time limit, divisions, or quiz title"}), 400
+
+    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title)
+
     if success:
         return jsonify({"message": "Quiz published successfully!"}), 200
     else:
@@ -483,3 +486,54 @@ def export_marks_api():
     teacher_id = session.get('id')
     data = quiz_service.get_all_student_marks_for_export(teacher_id)
     return jsonify(data), 200
+
+@professor_bp.route('/attempts/<int:attempt_id>', methods=['DELETE']) #❤️❤️❤️
+@professor_required
+def delete_attempt_api(attempt_id):
+    success = quiz_service.delete_quiz_attempt(attempt_id)
+    if success:
+        return jsonify({"message": "Attempt deleted successfully"}), 200
+    return jsonify({"message": "Failed to delete attempt"}), 500
+
+@professor_bp.route('/quiz-pending-students/<int:quiz_id>', methods=['GET'])#❤️❤️❤️
+@professor_required
+def get_pending_students_api(quiz_id):
+    students = quiz_service.get_pending_students(quiz_id)
+    return jsonify(students), 200
+
+@professor_bp.route('/course-roster', methods=['GET'])
+@professor_required
+def get_course_roster_api():
+    teacher_id = session.get('id')
+    course_id = request.args.get('course_id')
+    if not course_id:
+        return jsonify([]), 200
+        
+    roster = quiz_service.get_professor_course_roster(teacher_id, course_id)
+    return jsonify(roster), 200
+
+@professor_bp.route('/students/<int:student_id>/history', methods=['GET'])
+@professor_required
+def get_student_drilldown_api(student_id):
+    teacher_id = session.get('id')
+    course_id = request.args.get('course_id')
+    
+    if not course_id:
+        return jsonify({"message": "Course ID required"}), 400
+        
+    history = quiz_service.get_student_course_history(student_id, teacher_id, course_id)
+    return jsonify(history), 200
+
+@professor_bp.route('/attempts/<int:attempt_id>/override', methods=['PUT'])
+@professor_required
+def override_student_grade_api(attempt_id):
+    data = request.get_json()
+    new_score = data.get('new_score')
+    
+    if new_score is None:
+        return jsonify({"message": "New score is required"}), 400
+        
+    success = quiz_service.update_manual_grade(attempt_id, new_score)
+    if success:
+        return jsonify({"message": "Grade updated successfully"}), 200
+    return jsonify({"message": "Failed to update grade"}), 500
