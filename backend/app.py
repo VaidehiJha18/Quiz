@@ -33,8 +33,13 @@ def create_app(config_class=Config):
   print('=' * 50)
 
   app.config.update(
+<<<<<<< HEAD
       SESSION_COOKIE_SECURE=True,  # True for production/render
       SESSION_COOKIE_SAMESITE='None',  # 'None' for cross-site cookie support
+=======
+      SESSION_COOKIE_SECURE=True,  # True for Render / HTTPS
+      SESSION_COOKIE_SAMESITE='None',  # 'None' for cross-origin cookies
+>>>>>>> dev
       SESSION_COOKIE_HTTPONLY=True,
       SESSION_PERMANENT=False,
       SESSION_COOKIE_NAME='quiz_portal_session_new',
@@ -52,13 +57,21 @@ def create_app(config_class=Config):
 
   CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
+<<<<<<< HEAD
   # Register Blueprints
+=======
+  # Register Blueprints with explicit url_prefixes
+>>>>>>> dev
   app.register_blueprint(auth_bp)
   app.register_blueprint(professor_bp, url_prefix='/prof')
   app.register_blueprint(student_bp, url_prefix='/student')
   app.register_blueprint(admin_bp, url_prefix='/admin')
 
+<<<<<<< HEAD
   # Serve Frontend Static Build
+=======
+  # Serve Frontend Static Build & handle API route fallbacks
+>>>>>>> dev
   @app.route('/', defaults={'path': ''})
   @app.route('/<path:path>')
   def serve(path):
@@ -68,7 +81,6 @@ def create_app(config_class=Config):
         or path.startswith('auth/')
         or path.startswith('admin/')
     ):
-      # Let Flask return proper 404 JSON for unmatched backend routes instead of index.html
       return jsonify({'error': 'API Route Not Found'}), 404
 
     return send_from_directory(app.template_folder, 'index.html')
