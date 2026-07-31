@@ -537,3 +537,104 @@ def override_student_grade_api(attempt_id):
     if success:
         return jsonify({"message": "Grade updated successfully"}), 200
     return jsonify({"message": "Failed to update grade"}), 500
+
+
+
+
+#  REPLACEMENT QUESTION 
+
+@professor_bp.route("/get-replacement-question", methods=["POST"])
+def get_replacement_question():
+  data = request.json or {}
+  exclude_ids = data.get("exclude_ids", [])
+  subject = data.get("subject", None)
+
+  db = None
+  cursor = None
+  try:
+    db = get_db_connection()
+    cursor = db.cursor()
+
+    # 1. Fetch 1 random question from question_bank
+    query = "SELECT * FROM question_bank WHERE 1=1"
+    params = []
+
+    if exclude_ids:
+      format_strings = ",".join(["%s"] * len(exclude_ids))
+      query += f" AND id NOT IN ({format_strings})"
+      params.extend(exclude_ids)
+
+    if subject:
+      query += " AND subject = %s"
+      params.append(subject)
+
+    query += " ORDER BY RAND() LIMIT 1"
+
+    cursor.execute(query, params)
+    row = cursor.fetchone()
+
+    if not row:
+      return (
+          jsonify({
+              "success": False,
+              "message": "No additional questions available in database.",
+          }),
+          404,
+      )
+
+    # --- SAFE DICTIONARY CONVERSION ---
+    if isinstance(row, dict):
+      q = row
+    else:
+      # Map tuple values to column names
+      columns = [col[0] for col in cursor.description]
+      q = dict(zip(columns, row))
+
+    q_id = q.get("id")
+    q_text = q.get("question_txt") or q.get("question_text")
+
+    # 2. Fetch options from answer_map
+    opt_query = "SELECT * FROM answer_map WHERE question_id = %s"
+    cursor.execute(opt_query, (q_id,))
+    opt_rows = cursor.fetchall()
+
+    options = []
+    if opt_rows:
+      # Check if cursor returned dicts or tuples for answer_map
+      if isinstance(opt_rows[0], dict):
+        raw_options = opt_rows
+      else:
+        opt_cols = [col[0] for col in cursor.description]
+        raw_options = [dict(zip(opt_cols, r)) for r in opt_rows]
+
+      for opt in raw_options:
+        options.append({
+            "text": str(opt.get("option_text", "")),
+            "is_correct": bool(opt.get("is_correct")),
+        })
+
+    # DEBUG CHECK
+    print("=" * 50)
+    print("REAL Q_ID:", q_id)
+    print("REAL QUESTION TEXT:", q_text)
+    print("REAL OPTIONS COUNT:", len(options))
+    print("=" * 50)
+
+    formatted_question = {
+        "id": q_id,
+        "text": q_text,
+        "question_txt": q_text,
+        "options": options,
+    }
+
+    return jsonify({"success": True, "question": formatted_question}), 200
+
+  except Exception as e:
+    print("Error replacing question:", str(e))
+    return jsonify({"success": False, "message": str(e)}), 500
+
+  finally:
+    if cursor:
+      cursor.close()
+    if db:
+      db.close()
