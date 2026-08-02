@@ -92,8 +92,87 @@ export const fetchStudentResults = () => api.get('/student/results');
 export const fetchQuizQuestions = (token) => api.get(`/student/take-quiz/${token}`);
 
 // Add this to your existing apiService.js file
+// export const getAdminStats = async () => {
+//   const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+//     headers: {
+//       'Authorization': `Bearer ${localStorage.getItem('token')}`
+//     }
+//   });
+//   if (!response.ok) throw new Error("Failed to fetch statistics");
+//   return await response.json();
+// };
+// //Priyanka
+// // export const getAdminUsers = async () => {
+// //   // Replace with your actual Axios or fetch logic depending on what you use
+// //   const response = await fetch('http://localhost:5000/api/admin/users');
+// //   if (!response.ok) {
+// //     throw new Error('Failed to fetch admin users');
+// //   }
+// //   return await response.json();
+// // };
+// export const getAdminUsers = async (searchTerm = '', school = 'All', branch = 'All', semester = 'All') => {
+//   try {
+//     // This 'params' object automatically turns into ?search=...&school=... in the URL
+//     const response = await fetch(`${API_BASE_URL}/admin/users?search=${searchTerm}&school=${school}&branch=${branch}&semester=${semester}`, {
+//     headers: {
+//       'Authorization': `Bearer ${localStorage.getItem('token')}`
+//     }
+//   });
+//     return response.data;
+//   } catch (error) {
+//     throw error.response ? error.response.data : new Error("Failed to fetch admin users");
+//   }
+// };
+// export const getAdminUserDetails = async (userId) => {
+//   const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`);
+//   if (!response.ok) {
+//     throw new Error('Failed to fetch user details');
+//   }
+//   return await response.json();
+// };
+// //Priyanka
+// export const uploadAdminRoster = async (file) => {
+//   // 1. Wrap the file in a FormData envelope
+//   const formData = new FormData();
+//   formData.append('file', file);
+
+//   // 2. Send it to the new Python route we just built
+//   const response = await fetch(`${API_BASE_URL}/admin/users/upload`, {
+//     method: 'POST',
+//     body: formData, // Notice we don't use JSON.stringify here!
+//   });
+
+//   if (!response.ok) {
+//     const errorData = await response.json();
+//     throw new Error(errorData.error || 'Failed to upload roster');
+//   }
+  
+//   return await response.json();
+// };
+// // --- ADMIN: DELETE USER ---
+// export const deleteAdminUser = async (userId) => {
+//   try {
+//     const response = await api.delete(`/api/admin/users/${userId}`);
+//     return response.data;
+//   } catch (error) {
+//     console.error("Error deleting user:", error);
+//     throw error;
+//   }
+// };
+// // --- ADMIN: UPDATE USER ---
+// export const updateAdminUser = async (userId, userData) => {
+//   try {
+//     const response = await api.put(`/api/admin/users/${userId}`, userData);
+//     return response.data;
+//   } catch (error) {
+//     console.error("Error updating user:", error);
+//     throw error;
+//   }
+// };
+// Add this to your existing apiService.js file
 export const getAdminStats = async () => {
-  const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+  // ✅ FIX: Added 'api/' to the URL and removed the leading slash before it
+  const response = await fetch(`${API_BASE_URL}api/admin/stats`, {
     headers: {
       'Authorization': `Bearer ${localStorage.getItem('token')}`
     }
@@ -101,43 +180,42 @@ export const getAdminStats = async () => {
   if (!response.ok) throw new Error("Failed to fetch statistics");
   return await response.json();
 };
-//Priyanka
-// export const getAdminUsers = async () => {
-//   // Replace with your actual Axios or fetch logic depending on what you use
-//   const response = await fetch('http://localhost:5000/api/admin/users');
-//   if (!response.ok) {
-//     throw new Error('Failed to fetch admin users');
-//   }
-//   return await response.json();
-// };
+
 export const getAdminUsers = async (searchTerm = '', school = 'All', branch = 'All', semester = 'All') => {
   try {
-    // This 'params' object automatically turns into ?search=...&school=... in the URL
-    const response = await fetch(`${API_BASE_URL}/admin/users?search=${searchTerm}&school=${school}&branch=${branch}&semester=${semester}`, {
+    // ✅ FIX: Added 'api/' to the URL
+    const response = await fetch(`${API_BASE_URL}api/admin/users?search=${searchTerm}&school=${school}&branch=${branch}&semester=${semester}`, {
     headers: {
       'Authorization': `Bearer ${localStorage.getItem('token')}`
     }
   });
-    return response.data;
+    // ✅ FIX: Changed response.data to response.json() because you are using fetch(), not axios here
+    if (!response.ok) {
+      throw new Error("Failed to fetch admin users");
+    }
+    return await response.json(); 
   } catch (error) {
-    throw error.response ? error.response.data : new Error("Failed to fetch admin users");
+    throw error;
   }
 };
+
 export const getAdminUserDetails = async (userId) => {
+  // This one was already correct, keeping it as is!
   const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch user details');
   }
   return await response.json();
 };
+
 //Priyanka
 export const uploadAdminRoster = async (file) => {
   // 1. Wrap the file in a FormData envelope
   const formData = new FormData();
   formData.append('file', file);
 
-  // 2. Send it to the new Python route we just built
-  const response = await fetch(`${API_BASE_URL}/admin/users/upload`, {
+  // ✅ FIX: Added 'api/' to the URL
+  const response = await fetch(`${API_BASE_URL}api/admin/users/upload`, {
     method: 'POST',
     body: formData, // Notice we don't use JSON.stringify here!
   });
@@ -149,6 +227,7 @@ export const uploadAdminRoster = async (file) => {
   
   return await response.json();
 };
+
 // --- ADMIN: DELETE USER ---
 export const deleteAdminUser = async (userId) => {
   try {
@@ -159,6 +238,7 @@ export const deleteAdminUser = async (userId) => {
     throw error;
   }
 };
+
 // --- ADMIN: UPDATE USER ---
 export const updateAdminUser = async (userId, userData) => {
   try {
@@ -168,4 +248,206 @@ export const updateAdminUser = async (userId, userData) => {
     console.error("Error updating user:", error);
     throw error;
   }
+};
+
+// --- ADMIN SETUP: SCHOOLS ---
+export const getAdminSchools = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/schools`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch schools");
+  return await response.json();
+};
+
+export const addAdminSchool = async (name) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/schools`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify({ name })
+  });
+  if (!response.ok) throw new Error("Failed to add school");
+  return await response.json();
+};
+
+export const deleteAdminSchool = async (schoolId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/schools/${schoolId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to delete school");
+  }
+  return await response.json();
+};
+
+// --- ADMIN SETUP: PROGRAMS (BRANCHES) ---
+export const getAdminPrograms = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/programs`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch programs");
+  return await response.json();
+};
+
+export const addAdminProgram = async (name, schoolId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/programs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify({ name, school_id: schoolId })
+  });
+  if (!response.ok) throw new Error("Failed to add program");
+  return await response.json();
+};
+
+export const deleteAdminProgram = async (programId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/programs/${programId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to delete program");
+  }
+  return await response.json();
+};
+// --- ADMIN SETUP: SEMESTERS ---
+export const getAdminProgramSemesters = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/program_semesters`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch program semesters");
+  return await response.json();
+};
+
+export const addAdminProgramSemester = async (programId, semNo) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/program_semesters`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify({ program_id: programId, sem_no: semNo })
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to link semester");
+  }
+  return await response.json();
+};
+
+export const deleteAdminProgramSemester = async (programId, semesterId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/program_semesters/${programId}/${semesterId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to unlink semester");
+  }
+  return await response.json();
+};
+
+// --- ADMIN SETUP: DIVISIONS & BATCHES ---
+export const getAdminMappings = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/mappings`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch mappings");
+  return await response.json();
+};
+
+export const addAdminMapping = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/mappings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to map cohort");
+  }
+  return await response.json();
+};
+
+export const deleteAdminMapping = async (p_id, s_id, d_id, b_id) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/mappings/${p_id}/${s_id}/${d_id}/${b_id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to unlink cohort");
+  }
+  return await response.json();
+};
+
+// --- ADMIN SETUP: COURSES ---
+export const getAdminCourses = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/courses`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch courses");
+  return await response.json();
+};
+
+export const addAdminCourse = async (courseData) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/courses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify(courseData)
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to create course");
+  }
+  return await response.json();
+};
+
+export const getAdminSemesterCourses = async () => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/semester_courses`, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch semester courses");
+  return await response.json();
+};
+
+export const linkAdminSemesterCourse = async (semesterId, courseId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/semester_courses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify({ semester_id: semesterId, course_id: courseId })
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to link course");
+  }
+  return await response.json();
+};
+
+export const unlinkAdminSemesterCourse = async (semesterId, courseId) => {
+  const response = await fetch(`${API_BASE_URL}api/admin/setup/semester_courses/${semesterId}/${courseId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to unlink course");
+  }
+  return await response.json();
 };
