@@ -8,6 +8,10 @@ from ..extensions import get_db_connection
 import pymysql
 import traceback
 
+# ✅ NEW: Imported for bulk uploading
+import csv
+import io
+
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof') 
 
 # --- 1. Decorator: Ensure User is a Professor ---
@@ -170,6 +174,82 @@ def fetch_courses_list_view():
 
 # --- 3. Question Management Endpoints ---
 
+# 👇👇👇 START OF NEW BULK UPLOAD ROUTE 👇👇👇
+@professor_bp.route('/questions/bulk-upload', methods=['POST'])
+@professor_required
+def bulk_upload_questions():
+    # 1. Check if the file is in the request
+    if 'file' not in request.files:
+        return jsonify({"message": "No file part found in the request"}), 400
+        
+    file = request.files['file']
+    course_id = request.form.get('course_id') # We sent this from React!
+
+    # 2. Basic Validations
+    if file.filename == '':
+        return jsonify({"message": "No file selected"}), 400
+    if not file.filename.endswith('.csv'):
+        return jsonify({"message": "Only CSV files are allowed"}), 400
+    if not course_id:
+        return jsonify({"message": "Course ID is missing. Please select a course."}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    inserted_count = 0
+
+    try:
+        # 3. Read the CSV file directly from memory (no saving to disk needed)
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.DictReader(stream)
+        
+        for row in csv_input:
+            # Safely extract data from the CSV columns
+            unit = row.get('Unit', 1)
+            q_text = row.get('Question', '').strip()
+            opt_1 = row.get('Option 1', '').strip()
+            opt_2 = row.get('Option 2', '').strip()
+            opt_3 = row.get('Option 3', '').strip()
+            opt_4 = row.get('Option 4', '').strip()
+            correct_opt = str(row.get('Correct Answer', '')).strip() 
+            marks = row.get('Marks', 1)
+
+            # Skip completely empty rows
+            if not q_text:
+                continue
+            
+            # 4. Insert the Question into the database
+            sql_question = """
+                INSERT INTO questions (course_id, unit, question_txt, marks) 
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(sql_question, (course_id, unit, q_text, marks))
+            new_question_id = cursor.lastrowid # Get the ID of the question we just added
+
+            # 5. Insert the 4 Options mapped to the new question_id
+            options_data = [
+                (new_question_id, opt_1, 1 if correct_opt in ['1', 'Option 1', opt_1] else 0),
+                (new_question_id, opt_2, 1 if correct_opt in ['2', 'Option 2', opt_2] else 0),
+                (new_question_id, opt_3, 1 if correct_opt in ['3', 'Option 3', opt_3] else 0),
+                (new_question_id, opt_4, 1 if correct_opt in ['4', 'Option 4', opt_4] else 0)
+            ]
+            
+            sql_options = "INSERT INTO options (question_id, option_text, is_correct) VALUES (%s, %s, %s)"
+            cursor.executemany(sql_options, options_data)
+            
+            inserted_count += 1
+            
+        conn.commit()
+        return jsonify({"message": "Bulk upload successful", "inserted_count": inserted_count}), 201
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error during bulk upload: {e}")
+        return jsonify({"message": "Failed to process CSV file. Ensure columns match the template."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+# 👆👆👆 END OF NEW BULK UPLOAD ROUTE 👆👆👆
+
 @professor_bp.route('/questions', methods=['GET'])
 @professor_required
 def get_questions_api():
@@ -186,7 +266,7 @@ def get_questions_api():
         if questions is None:
             print("WARNING: quiz_service.fetch_questions returned None. Returning empty object {}")
             questions = {}
-            
+             
         return jsonify(questions), 200
     except Exception as e:
         return jsonify({"message": f"Error fetching questions: {str(e)}"}), 500
@@ -215,7 +295,7 @@ def add_question_api():
         print(f"Error during question insertion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
 
-@professor_bp.route('/questions/<int:id>', methods=['GET', 'PUT'])
+@professor_bp.route('/questions/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @professor_required
 def handle_single_question(id):
     """Handles fetching (GET) and updating (PUT) a single question."""
@@ -248,33 +328,6 @@ def handle_single_question(id):
             print(f"!!! ERROR during DELETE for ID {id}: {e}")
             return jsonify({'message': 'Internal Server Error during deletion.'}), 500
     return jsonify({'message': 'Method not allowed'}), 405  
-
-# @professor_bp.route('/questions/<int:qid>', methods=['GET', 'PUT', 'DELETE'])
-# @professor_required
-# def handle_single_question(qid):
-#     try:
-#         if request.method == 'GET':
-#             data = quiz_service.get_question_by_id(qid)
-#             if not data:
-#                 return jsonify({'message': 'Question not found'}), 404
-#             return jsonify(data), 200
-        
-#         elif request.method == 'PUT':
-#             data = request.get_json()
-#             success = quiz_service.update_question(qid, data)
-#             if not success:
-#                 return jsonify({'message': 'Update failed'}), 400
-#             return jsonify({'message': 'Question updated successfully'}), 200
-        
-#         elif request.method == 'DELETE':
-#             success = quiz_service.delete_question(qid)
-#             if not success:
-#                 return jsonify({'message': 'Deletion failed'}), 400
-#             return jsonify({'message': 'Question deleted successfully'}), 200
-            
-#     except Exception as e:
-#         print(f"Error handling single question {qid}: {e}")
-#         return jsonify({'message': 'Internal Server Error'}), 500
 
 @professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE','OPTIONS'])
 @professor_required
