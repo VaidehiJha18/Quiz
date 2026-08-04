@@ -125,23 +125,23 @@ export default function ViewQuizzesPage() {
     }
   };
 
-  // Helper to format ISO timestamps cleanly in local time
+  // ✅ Correct local time formatter
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const formattedStr = dateString.endsWith('Z') ? dateString : `${dateString}Z`;
-    const date = new Date(formattedStr);
-    
-    if (isNaN(date.getTime())) return dateString;
+  if (!dateString) return '-';
+  
+  // Parse date string without forcing UTC 'Z'
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
 
-    return date.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
 
   // Helper to display Start to End window
   const formatScheduleWindow = (start, end) => {
