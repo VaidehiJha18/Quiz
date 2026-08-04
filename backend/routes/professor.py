@@ -487,25 +487,34 @@ def get_divisions_api():
     divisions = quiz_service.get_divisions_for_publish(teacher_id, course_id)
     return jsonify(divisions), 200
 
+# 6. Publish Quiz to Divisions ❤️❤️❤️❤️❤️
 @professor_bp.route('/quizzes/<int:quiz_id>/publish', methods=['POST'])
 @professor_required
 def publish_quiz_api(quiz_id):
     data = request.get_json()
     time_limit = data.get('time_limit')
     division_ids = data.get('division_ids') # Array of IDs, e.g., [1, 2]
-
     quiz_title = data.get('quiz_title')
+    start_time = data.get('start_time')     # e.g., "2026-08-04T17:30"
+    end_time = data.get('end_time')         # e.g., "2026-08-04T17:40"
 
     if not time_limit or not division_ids or not quiz_title:
         return jsonify({"message": "Missing time limit, divisions, or quiz title"}), 400
 
-    success = quiz_service.publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title)
+    success = quiz_service.publish_quiz_to_divisions(
+        quiz_id=quiz_id, 
+        time_limit=time_limit, 
+        division_ids=division_ids, 
+        quiz_title=quiz_title,
+        start_time=start_time,
+        end_time=end_time
+    )
 
     if success:
-        return jsonify({"message": "Quiz published successfully!"}), 200
+        return jsonify({"message": "Quiz scheduled & published successfully!"}), 200
     else:
         return jsonify({"message": "Failed to publish quiz."}), 500
-    
+
 @professor_bp.route('/quiz-results/<int:quiz_id>', methods=['GET'])
 @professor_required
 def view_results(quiz_id):

@@ -443,23 +443,43 @@ def get_professor_quizzes(teacher_id):
     try:
         sql = """
             SELECT 
-                id, quiz_title, teacher, school, department, program, 
-                semester, course, course_id, total_questions, 
-                quiz_status AS status, 
-                quiz_link, 
-                quiz_token AS token, 
-                created_at 
-            FROM quizzes 
-            WHERE teacher_id = %s 
-            ORDER BY created_at DESC
+                q.id, 
+                q.quiz_title, 
+                q.teacher, 
+                q.school, 
+                q.department, 
+                q.program, 
+                q.semester, 
+                q.course, 
+                q.course_id, 
+                q.total_questions, 
+                q.time_limit,
+                q.quiz_status AS status, 
+                q.quiz_link, 
+                q.quiz_token AS token, 
+                q.start_time,
+                q.end_time,
+                q.created_at,
+                GROUP_CONCAT(d.division SEPARATOR ', ') AS published_divisions
+            FROM quizzes q
+            LEFT JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            LEFT JOIN division d ON qscd.division_id = d.id
+            WHERE q.teacher_id = %s 
+            GROUP BY q.id
+            ORDER BY q.created_at DESC
         """
         cursor.execute(sql, (teacher_id,))
         results = cursor.fetchall()
         
-        # Convert datetime objects to string
         for row in results:
-            if row['created_at']:
+            if row.get('created_at'):
                 row['created_at'] = row['created_at'].isoformat()
+            if row.get('start_time'):
+                row['start_time'] = row['start_time'].isoformat()
+            if row.get('end_time'):
+                row['end_time'] = row['end_time'].isoformat()
+            if not row.get('published_divisions'):
+                row['published_divisions'] = 'Not Assigned'
                 
         return results
     except Exception as e:
@@ -625,21 +645,22 @@ def get_divisions_for_publish(teacher_id, course_id):
         cursor.close()
         conn.close()
 
-# Add this function to handle the Publish logic
-def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
-    """Updates quiz status and links it to specific divisions."""
+# Add this function to handle the Publish logic ❤️❤️❤️
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, start_time=None, end_time=None):
+    """Updates quiz status, scheduling times, and links it to specific divisions."""
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Update Quiz Metadata (Time Limit & Status)
+        # 1. Update Quiz Metadata including start_time and end_time
         update_quiz_sql = """
             UPDATE quizzes 
-            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s 
+            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s,
+                start_time = %s, end_time = %s
             WHERE id = %s
         """
-        cursor.execute(update_quiz_sql, (time_limit, quiz_title, quiz_id))
+        cursor.execute(update_quiz_sql, (time_limit, quiz_title, start_time, end_time, quiz_id))
 
-        # 2. Get Course and Semester info from the quiz to ensure consistency
+        # 2. Get Course and Semester info from the quiz
         get_ids_sql = """
             SELECT q.course_id, sc.semester_id 
             FROM quizzes q
@@ -647,7 +668,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
             WHERE q.id = %s LIMIT 1
         """
         cursor.execute(get_ids_sql, (quiz_id,))
-        meta = cursor.fetchone() # returns tuple (course_id, semester_id)
+        meta = cursor.fetchone()
         
         if not meta:
             raise Exception("Could not verify course/semester details.")
@@ -656,7 +677,6 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
         semester_id = meta['semester_id']
 
         # 3. Link Quiz to Selected Divisions
-        # Clear old links first to prevent duplicates
         cursor.execute("DELETE FROM quiz_semester_course_division WHERE quiz_id = %s", (quiz_id,))
 
         insert_div_sql = """
@@ -676,7 +696,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
         return False
     finally:
         cursor.close()
-        conn.close() 
+        conn.close()
 
 def get_professor_results_table(quiz_id):
     conn = get_db_connection()
@@ -792,10 +812,28 @@ def get_all_student_marks_for_export(teacher_id):
         conn.close()
 
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
-# STUDENT SIDE
+# STUDENT SIDE ❤️❤️❤️
 def get_quiz_for_student(token):
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+    # Check schedule time window
+    time_check_query = """
+        SELECT quiz_title, start_time, end_time 
+        FROM quizzes 
+        WHERE quiz_token = %s
+    """
+    cursor.execute(time_check_query, (token,))
+    quiz_meta = cursor.fetchone()
+
+    if not quiz_meta:
+        return {'error': 'Quiz not found.'}
+
+    now = datetime.now()
+    if quiz_meta['start_time'] and now < quiz_meta['start_time']:
+        return {'error': f"Quiz is scheduled to start at {quiz_meta['start_time']}."}
+    if quiz_meta['end_time'] and now > quiz_meta['end_time']:
+        return {'error': "This quiz schedule has expired."}
 
     query = """
         SELECT q.quiz_title, qb.id as question_id, qb.question_txt, 
@@ -809,15 +847,8 @@ def get_quiz_for_student(token):
     cursor.execute(query, (token,))
     quiz_info = cursor.fetchall()
 
-    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
-    # Check Question and Option Counts of a Token, for debugging
-    # unique_question_ids = {row['question_id'] for row in quiz_info}
-    # print(f"Total rows (options) returned: {len(quiz_info)}")
-    # print(f"Total unique questions: {len(unique_question_ids)}")
-    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
-
     if not quiz_info:
-        return 'Invalid token or no quiz found.'
+        return {'error': 'No questions found for this quiz.'}
 
     quiz_data = {
         "title": quiz_info[0]['quiz_title'],
