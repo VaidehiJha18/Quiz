@@ -7,7 +7,7 @@ export default function ManageUsersPage() {
   const [roleTab, setRoleTab] = useState('student'); // 'student' or 'professor'
   const [search, setSearch] = useState('');
 
-  // Hierarchy filter states
+  // Hierarchy filter states (Background Dashboard Filters)
   const [schools, setSchools] = useState([]);
   const [branches, setBranches] = useState([]);
   const [semesters, setSemesters] = useState([]);
@@ -18,11 +18,12 @@ export default function ManageUsersPage() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedDivision, setSelectedDivision] = useState('');
 
-  // Upload Modal State
+  // Upload Modal State (Isolated Independent State)
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
-  const [targetProgram, setTargetProgram] = useState('');
-  const [targetSemester, setTargetSemester] = useState('');
+  const [targetSchool, setTargetSchool] = useState('');     // Isolated modal school
+  const [targetProgram, setTargetProgram] = useState('');   // Isolated modal branch
+  const [targetSemester, setTargetSemester] = useState(''); // Isolated modal semester
   const [targetDivision, setTargetDivision] = useState('');
   const [targetBatch, setTargetBatch] = useState('');
 
@@ -98,6 +99,11 @@ export default function ManageUsersPage() {
         alert(result.message);
         setShowUploadModal(false);
         setUploadFile(null);
+        setTargetSchool('');
+        setTargetProgram('');
+        setTargetSemester('');
+        setTargetDivision('');
+        setTargetBatch('');
         fetchUsers();
       } else {
         alert(result.error || "Upload failed");
@@ -125,8 +131,13 @@ export default function ManageUsersPage() {
     }
   };
 
+  // Dashboard filter cascading lists
   const availableBranches = branches.filter(b => b.school_id === parseInt(selectedSchool || 0));
   const availableSemesters = semesters.filter(s => s.program_id === parseInt(selectedBranch || 0));
+
+  // Modal cascading lists (completely separated from background)
+  const modalAvailableBranches = branches.filter(b => b.school_id === parseInt(targetSchool || 0));
+  const modalAvailableSemesters = semesters.filter(s => s.program_id === parseInt(targetProgram || 0));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
@@ -148,41 +159,23 @@ export default function ManageUsersPage() {
             </button>
           </div>
 
-          {/* Professional UI Segmented Role Switcher */}
+          {/* Role Switcher */}
           <div style={{ display: 'inline-flex', backgroundColor: '#e9ecef', padding: '4px', borderRadius: '10px', marginBottom: '25px' }}>
             <button 
               onClick={() => setRoleTab('student')}
-              style={{ 
-                padding: '10px 25px', 
-                backgroundColor: roleTab === 'student' ? '#4a3b69' : 'transparent', 
-                color: roleTab === 'student' ? 'white' : '#495057', 
-                border: 'none', 
-                borderRadius: '8px', 
-                cursor: 'pointer', 
-                fontWeight: '600',
-                transition: 'all 0.2s ease'
-              }}
+              style={{ padding: '10px 25px', backgroundColor: roleTab === 'student' ? '#4a3b69' : 'transparent', color: roleTab === 'student' ? 'white' : '#495057', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
             >
               Student Roster
             </button>
             <button 
               onClick={() => setRoleTab('professor')}
-              style={{ 
-                padding: '10px 25px', 
-                backgroundColor: roleTab === 'professor' ? '#4a3b69' : 'transparent', 
-                color: roleTab === 'professor' ? 'white' : '#495057', 
-                border: 'none', 
-                borderRadius: '8px', 
-                cursor: 'pointer', 
-                fontWeight: '600',
-                transition: 'all 0.2s ease'
-              }}
+              style={{ padding: '10px 25px', backgroundColor: roleTab === 'professor' ? '#4a3b69' : 'transparent', color: roleTab === 'professor' ? 'white' : '#495057', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
             >
               Faculty / Professor Roster
             </button>
           </div>
 
-          {/* Cascading Filter-First Bar (Only for Students) */}
+          {/* Background Dashboard Cascading Filter Bar */}
           {roleTab === 'student' && (
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.03)' }}>
               <input 
@@ -280,7 +273,7 @@ export default function ManageUsersPage() {
                   </tr>
                 ) : (
                   users.map(u => (
-                    <tr key={u.user_id} style={{ borderBottom: '1px solid #f1f3f5', transition: 'background 0.1s' }}>
+                    <tr key={u.user_id} style={{ borderBottom: '1px solid #f1f3f5' }}>
                       <td style={{ padding: '15px 20px', color: '#adb5bd' }}>#{u.user_id}</td>
                       <td style={{ padding: '15px 20px', fontWeight: '500', color: '#212529' }}>{u.user_name}</td>
                       <td style={{ padding: '15px 20px', color: '#6c757d' }}>{u.email}</td>
@@ -311,41 +304,79 @@ export default function ManageUsersPage() {
             </table>
           </div>
 
-          {/* Hierarchical Bulk Upload Modal */}
+          {/* Hierarchical Bulk Upload Modal (Using Isolated target* states) */}
           {showUploadModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
               <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '14px', width: '480px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ marginTop: 0, color: '#4a3b69', fontSize: '20px' }}>Hierarchical Bulk Roster Upload</h3>
-                <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>Select the target micro-cohort context before uploading the student spreadsheet (CSV/Excel).</p>
+                <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>Follow the institutional hierarchy before uploading your spreadsheet (CSV/Excel).</p>
                 
                 <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  
+                  {/* 1. Target School */}
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>Target Branch / Program</label>
-                    <select value={targetProgram} onChange={(e) => setTargetProgram(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px' }} required>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>1. Target School</label>
+                    <select 
+                      value={targetSchool} 
+                      onChange={(e) => {
+                        setTargetSchool(e.target.value);
+                        setTargetProgram('');
+                        setTargetSemester('');
+                      }} 
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px' }} 
+                      required
+                    >
+                      <option value="">Select School...</option>
+                      {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* 2. Target Branch / Program */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>2. Target Branch / Program</label>
+                    <select 
+                      value={targetProgram} 
+                      onChange={(e) => {
+                        setTargetProgram(e.target.value);
+                        setTargetSemester('');
+                      }} 
+                      disabled={!targetSchool}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px', backgroundColor: !targetSchool ? '#f8f9fa' : '#fff' }} 
+                      required
+                    >
                       <option value="">Select Branch...</option>
-                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      {modalAvailableBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
 
+                  {/* 3. Target Semester */}
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>Target Semester ID</label>
-                    <select value={targetSemester} onChange={(e) => setTargetSemester(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px' }} required>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>3. Target Semester</label>
+                    <select 
+                      value={targetSemester} 
+                      onChange={(e) => setTargetSemester(e.target.value)} 
+                      disabled={!targetProgram}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px', backgroundColor: !targetProgram ? '#f8f9fa' : '#fff' }} 
+                      required
+                    >
                       <option value="">Select Semester ID...</option>
-                      {semesters.filter(s => s.program_id === parseInt(targetProgram || 0)).map(s => <option key={s.semester_id} value={s.semester_id}>Semester {s.sem_no}</option>)}
+                      {modalAvailableSemesters.map(s => <option key={s.semester_id} value={s.semester_id}>Semester {s.sem_no}</option>)}
                     </select>
                   </div>
 
+                  {/* 4. Division & Batch */}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>Division ID</label>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>4. Division ID</label>
                       <input type="number" placeholder="Div ID (e.g., 1)" value={targetDivision} onChange={(e) => setTargetDivision(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px' }} required />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>Batch ID</label>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>5. Batch ID</label>
                       <input type="number" placeholder="Batch ID (e.g., 1)" value={targetBatch} onChange={(e) => setTargetBatch(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', marginTop: '5px' }} required />
                     </div>
                   </div>
 
+                  {/* File Upload */}
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#495057' }}>Spreadsheet File (CSV / Excel)</label>
                     <input type="file" accept=".csv, .xlsx, .xls" onChange={(e) => setUploadFile(e.target.files[0])} style={{ width: '100%', padding: '10px', marginTop: '5px', border: '1px dashed #ced4da', borderRadius: '8px' }} required />
