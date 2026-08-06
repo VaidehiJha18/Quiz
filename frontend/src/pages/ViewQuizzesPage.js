@@ -119,7 +119,9 @@ export default function ViewQuizzesPage() {
         loadQuizzes();
     } catch (err) {
         console.error("Publish failed:", err);
-        alert("Failed to publish quiz.");
+        // Extract the specific backend error message (e.g. 409 conflict message)
+        const errorMessage = err.response?.data?.message || "Failed to publish quiz. Please try again.";
+        alert(errorMessage);
     } finally {
         setPublishing(false);
     }
@@ -288,19 +290,19 @@ export default function ViewQuizzesPage() {
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                           <button
                             onClick={() => handlePublishClick(quiz)}
-                            disabled={quiz.status === 'Published'}
+                            disabled={quiz.status === 'Published' && quiz.start_time && quiz.end_time}
                             style={{
                               padding: '6px 12px',
-                              backgroundColor: quiz.status === 'Published' ? '#cbd5e1' : '#16a34a',
+                              backgroundColor: (quiz.status === 'Published' && quiz.start_time && quiz.end_time) ? '#cbd5e1' : '#16a34a',
                               color: 'white', 
                               border: 'none', 
                               borderRadius: '6px', 
-                              cursor: quiz.status === 'Published' ? 'not-allowed' : 'pointer',
+                              cursor: (quiz.status === 'Published' && quiz.start_time && quiz.end_time) ? 'not-allowed' : 'pointer',
                               fontSize: '12px', 
                               fontWeight: '600'
                             }}
                           >
-                            {quiz.status === 'Published' ? 'Published' : 'Publish'}
+                            {(quiz.status === 'Published' && quiz.start_time && quiz.end_time) ? 'Published' : 'Publish'}
                           </button>
 
                           <button

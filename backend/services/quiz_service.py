@@ -645,13 +645,77 @@ def get_divisions_for_publish(teacher_id, course_id):
         cursor.close()
         conn.close()
 
-# Add this function to handle the Publish logic ❤️❤️❤️
-def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, start_time=None, end_time=None):
-    """Updates quiz status, scheduling times, and links it to specific divisions."""
+def check_division_schedule_conflict(division_ids, start_time, end_time, current_quiz_id=None):
+    """
+    Checks if any of the given division_ids already have an active/published quiz
+    scheduled in an overlapping time window.
+    
+    Two time slots overlap when:
+      (Existing Start < New End) AND (Existing End > New Start)
+    
+    Returns (True, conflicting_division_name) if a conflict exists, otherwise (False, None).
+    """
+    if not start_time or not end_time or not division_ids:
+        return False, None
+
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Update Quiz Metadata including start_time and end_time
+        format_strings = ', '.join(['%s'] * len(division_ids))
+        
+        # SQL query to detect overlapping time slots for the given divisions
+        sql = f"""
+            SELECT d.division, q.quiz_title, q.start_time, q.end_time
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            JOIN division d ON qscd.division_id = d.id
+            WHERE qscd.division_id IN ({format_strings})
+              AND q.quiz_status = 'Published'
+              AND q.start_time < %s
+              AND q.end_time > %s
+        """
+        params = list(division_ids) + [end_time, start_time]
+
+        # Exclude self when updating/re-publishing an existing quiz
+        if current_quiz_id:
+            sql += " AND q.id != %s"
+            params.append(current_quiz_id)
+
+        sql += " LIMIT 1"
+
+        cursor.execute(sql, tuple(params))
+        conflict = cursor.fetchone()
+
+        if conflict:
+            return True, conflict['division']
+            
+        return False, None
+    except Exception as e:
+        print(f"Error checking schedule conflict: {e}")
+        return False, None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, start_time=None, end_time=None):
+    """Updates quiz status, scheduling times, and links it to specific divisions after checking for conflicts."""
+    
+    # 1. Check for schedule conflicts across selected divisions
+    has_conflict, conflicting_div = check_division_schedule_conflict(
+        division_ids=division_ids,
+        start_time=start_time,
+        end_time=end_time,
+        current_quiz_id=quiz_id
+    )
+
+    if has_conflict:
+        return False, f"Division {conflicting_div} already has a scheduled quiz during this time slot."
+
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 2. Update Quiz Metadata including start_time and end_time
         update_quiz_sql = """
             UPDATE quizzes 
             SET time_limit = %s, quiz_status = 'Published', quiz_title = %s,
@@ -660,7 +724,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, sta
         """
         cursor.execute(update_quiz_sql, (time_limit, quiz_title, start_time, end_time, quiz_id))
 
-        # 2. Get Course and Semester info from the quiz
+        # 3. Get Course and Semester info from the quiz
         get_ids_sql = """
             SELECT q.course_id, sc.semester_id 
             FROM quizzes q
@@ -676,7 +740,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, sta
         course_id = meta['course_id']
         semester_id = meta['semester_id']
 
-        # 3. Link Quiz to Selected Divisions
+        # 4. Link Quiz to Selected Divisions
         cursor.execute("DELETE FROM quiz_semester_course_division WHERE quiz_id = %s", (quiz_id,))
 
         insert_div_sql = """
@@ -689,11 +753,11 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, sta
             cursor.execute(insert_div_sql, (quiz_id, semester_id, course_id, div_id))
 
         conn.commit()
-        return True
+        return True, "Quiz scheduled & published successfully!"
     except Exception as e:
         conn.rollback()
         print(f"Error publishing quiz: {type(e).__name__}: {e}")
-        return False
+        return False, "Failed to publish quiz due to internal error."
     finally:
         cursor.close()
         conn.close()
