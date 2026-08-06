@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, session, request
 from ..services import quiz_service
 from ..extensions import get_db_connection
 import pymysql
+from datetime import datetime  # 👈 Added datetime import
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 
@@ -43,7 +44,9 @@ def student_dashboard():
                 q.time_limit, 
                 q.quiz_token,
                 q.quiz_status,
-                q.created_at
+                q.created_at,
+                q.start_time,
+                q.end_time
             FROM quizzes q
             JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             WHERE 
@@ -53,17 +56,45 @@ def student_dashboard():
                 AND q.id NOT IN (
                     SELECT quiz_id FROM student_quiz_attempt WHERE student_id = %s
                 )
-            ORDER BY q.created_at DESC
+            ORDER BY q.start_time ASC
         """
         #  Pass student_id as the 3rd parameter
         cursor.execute(quiz_sql, (sem_id, div_id, student_id))
         quizzes = cursor.fetchall()
-        
-        for q in quizzes:
-            if q['created_at']:
-                q['created_at'] = q['created_at'].isoformat()
 
-        return jsonify(quizzes), 200
+        now = datetime.now()
+        active_quizzes = []
+
+        for q in quizzes:
+            start_val = q.get('start_time')
+            end_val = q.get('end_time')
+
+            if start_val and end_val:
+                # Convert string to datetime object if MySQL returned a string
+                if isinstance(start_val, str):
+                    start_val = datetime.fromisoformat(start_val.replace('T', ' ').replace('Z', ''))
+                if isinstance(end_val, str):
+                    end_val = datetime.fromisoformat(end_val.replace('T', ' ').replace('Z', ''))
+
+                # Print comparison for terminal debugging
+                print(f"DEBUG: Checking Quiz '{q['quiz_title']}' | Start: {start_val} <= Now: {now} <= End: {end_val}")
+
+                # Skip if current system time is outside scheduled window
+                if not (start_val <= now <= end_val):
+                    print(f"DEBUG: Quiz '{q['quiz_title']}' skipped due to time window.")
+                    continue
+
+            # Format datetime objects back to ISO strings for React
+            if isinstance(q.get('created_at'), datetime):
+                q['created_at'] = q['created_at'].isoformat()
+            if isinstance(q.get('start_time'), datetime):
+                q['start_time'] = q['start_time'].isoformat()
+            if isinstance(q.get('end_time'), datetime):
+                q['end_time'] = q['end_time'].isoformat()
+
+            active_quizzes.append(q)
+
+        return jsonify(active_quizzes), 200
 
     except Exception as e:
         print(f"Error fetching student dashboard: {e}")
@@ -186,39 +217,96 @@ def get_attempt_result(attempt_id):
         conn.close()
 
 # --- History Route ---
+from datetime import datetime
+
 @student_bp.route('/my-history', methods=['GET'])
-def get_student_history():
+def get_student_quiz_history():
+    student_id = session.get('id')
+    if not student_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        student_id = session.get('id')
-        if not student_id:
-            return jsonify({"message": "Unauthorized"}), 401
+        info_sql = "SELECT semester_id, division_id FROM student_academic_info WHERE student_id = %s"
+        cursor.execute(info_sql, (student_id,))
+        student_info = cursor.fetchone()
 
-        # Fetch all attempts for this student
-        sql = """
+        if not student_info:
+            return jsonify([]), 200
+
+        sem_id = student_info['semester_id']
+        div_id = student_info['division_id']
+
+        # 1. Fetch Completed Quizzes
+        completed_sql = """
             SELECT 
-                qa.attempt_id, 
-                qa.total_score, 
-                qa.submit_time, 
-                qa.is_published,
-                q.quiz_title
+                sqa.attempt_id,
+                q.quiz_title,
+                q.teacher,
+                qa.submit_time AS submit_time,
+                COALESCE(qa.total_score, 0) AS total_score,
+                q.total_questions,
+                'Completed' AS status,
+                1 AS is_published
             FROM student_quiz_attempt sqa
-            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             JOIN quizzes q ON sqa.quiz_id = q.id
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             WHERE sqa.student_id = %s
-            ORDER BY qa.submit_time DESC
         """
-        cursor.execute(sql, (student_id,))
-        history = cursor.fetchall()
+        cursor.execute(completed_sql, (student_id,))
+        completed_quizzes = list(cursor.fetchall() or [])
 
-        return jsonify(history), 200
+        # 2. Fetch All Published Quizzes assigned to student's section
+        published_sql = """
+            SELECT 
+                NULL AS attempt_id,
+                q.id AS quiz_id,
+                q.quiz_title,
+                q.teacher,
+                q.end_time AS submit_time,
+                0 AS total_score,
+                q.total_questions,
+                'Missed' AS status,
+                0 AS is_published,
+                q.end_time
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            WHERE q.quiz_status = 'Published'
+              AND qscd.semester_id = %s
+              AND qscd.division_id = %s
+              AND q.id NOT IN (
+                  SELECT quiz_id FROM student_quiz_attempt WHERE student_id = %s
+              )
+        """
+        cursor.execute(published_sql, (sem_id, div_id, student_id))
+        all_unattempted = list(cursor.fetchall() or [])
+
+        now = datetime.now()
+        missed_quizzes = []
+
+        # 3. Filter unattempted quizzes in Python where end_time has passed
+        for q in all_unattempted:
+            end_val = q.get('end_time')
+            if end_val:
+                if isinstance(end_val, str):
+                    end_val = datetime.fromisoformat(end_val.replace('T', ' ').replace('Z', ''))
+                if end_val < now:
+                    missed_quizzes.append(q)
+
+        all_history = completed_quizzes + missed_quizzes
+
+        for record in all_history:
+            if record.get('submit_time') and not isinstance(record['submit_time'], str):
+                record['submit_time'] = record['submit_time'].isoformat()
+
+        all_history.sort(key=lambda x: str(x.get('submit_time') or ''), reverse=True)
+
+        return jsonify(all_history), 200
 
     except Exception as e:
-        print(f"Error fetching history: {e}")
-        return jsonify({"message": "Server Error"}), 500
+        print(f"Error fetching student quiz history: {e}")
+        return jsonify({"message": "Server error fetching history"}), 500
     finally:
         cursor.close()
         conn.close()
-
-
