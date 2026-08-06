@@ -1,10 +1,9 @@
-// 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const AdminSidebar = () => {
   const location = useLocation();
-  const navigate = useNavigate(); // <-- Added useNavigate for redirection
+  const navigate = useNavigate();
 
   // --- THE LOGOUT FUNCTION ---
   const handleLogout = () => {
@@ -12,13 +11,13 @@ const AdminSidebar = () => {
     navigate('/login');   // Send back to login page
   };
 
-  // Helper to style active links like the "Home Page" button in your screenshot
+  // Helper to style active links like the "Home Page" button
   const getLinkStyle = (path) => ({
     display: 'block',
     padding: '12px 20px',
     color: 'white',
     textDecoration: 'none',
-    backgroundColor: location.pathname === path ? '#8a6fc6' : 'transparent', // Matches your active state
+    backgroundColor: location.pathname === path ? '#8a6fc6' : 'transparent',
     borderRadius: location.pathname === path ? '8px' : '0px',
     fontWeight: '500',
     marginBottom: '5px',
@@ -26,8 +25,20 @@ const AdminSidebar = () => {
   });
 
   return (
-    // Added display: 'flex', flexDirection: 'column' so we can push the logout button to the bottom
-    <div style={{ width: '260px', minHeight: '100vh', backgroundColor: '#3b2c55', color: 'white', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+    <div style={{ 
+      width: '260px', 
+      height: '100vh',           /* Locks height to the full viewport */
+      position: 'sticky',        /* Keeps it pinned in place */
+      top: 0,                    /* Sticks to the very top */
+      backgroundColor: '#3b2c55', 
+      color: 'white', 
+      padding: '20px', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      boxSizing: 'border-box',
+      flexShrink: 0,
+      overflowY: 'auto'          /* Allows sidebar items to scroll internally if screen is short */
+    }}>
       
       {/* --- TOP CONTENT --- */}
       <div>
@@ -64,7 +75,6 @@ const AdminSidebar = () => {
       </div>
 
       {/* --- BOTTOM CONTENT (LOGOUT BUTTON) --- */}
-      {/* marginTop: 'auto' forces this div to the absolute bottom of the flex container */}
       <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid rgba(160, 149, 181, 0.3)' }}>
         <button 
           onClick={handleLogout}
@@ -84,8 +94,8 @@ const AdminSidebar = () => {
             borderRadius: '8px',
             transition: 'background 0.2s'
           }}
-          onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(217, 83, 79, 0.1)'}
-          onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(217, 83, 79, 0.1)'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           {/* Simple Exit Icon */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
