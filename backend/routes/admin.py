@@ -24,7 +24,10 @@ def get_dashboard_stats():
         cursor.execute("SELECT COUNT(*) as count FROM user_account WHERE role_id = 2")
         professor_count = cursor.fetchone()['count']
 
-        quiz_count = 0   # Placeholder
+        # Count Quizzes (Assumes your table is named 'quiz')
+        # cursor.execute("SELECT COUNT(*) as count FROM quiz")
+        # quiz_count = cursor.fetchone()['count']
+        quiz_count = 0   #Priyanka
         
         return jsonify({
             "students": student_count,
@@ -38,7 +41,7 @@ def get_dashboard_stats():
     finally:
         cursor.close()
         conn.close()
-
+#Priyanka
 
 # ---------------------------------------------------------
 # 2. THE USERS ROUTE (Upgraded for Hierarchical Filtering)
