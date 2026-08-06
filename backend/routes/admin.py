@@ -1,27 +1,3 @@
-# from flask import Blueprint, jsonify
-# # Import your actual SQLAlchemy models here
-# from models.user import User 
-# from models.quiz import Quiz 
-
-# admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
-
-# @admin_bp.route('/stats', methods=['GET'])
-# def get_dashboard_stats():
-#     try:
-#         # Querying the real database directly
-#         # Assuming your User table has a 'role' column. Adjust if different!
-#         student_count = User.query.filter_by(role='student').count()
-#         professor_count = User.query.filter_by(role='professor').count()
-#         quiz_count = Quiz.query.count()
-        
-#         return jsonify({
-#             "students": student_count,
-#             "professors": professor_count,
-#             "quizzes": quiz_count
-#         }), 200
-        
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 import pandas as pd
 from flask import request 
 from werkzeug.security import generate_password_hash 
@@ -66,122 +42,59 @@ def get_dashboard_stats():
         cursor.close()
         conn.close()
 #Priyanka
+
 # ---------------------------------------------------------
 # 2. THE USERS ROUTE (Upgraded for Hierarchical Filtering)
 # ---------------------------------------------------------
-# @admin_bp.route('/users', methods=['GET'])
-# def get_all_users():
-#     conn = get_db_connection()
-#     cursor = conn.cursor(pymysql.cursors.DictCursor)
-#     try:
-#         # 1. Grab filters from React request
-#         search = request.args.get('search', '', type=str)
-#         school = request.args.get('school', 'All')
-#         branch = request.args.get('branch', 'All')
-#         semester = request.args.get('semester', 'All')
-
-#         # 2. Build the Base Query with academic JOINs
-#         # We use LEFT JOIN so Professors still show up even if they don't have student info
-#         sql = """
-#             SELECT 
-#                 u.user_id, 
-#                 u.user_name, 
-#                 u.email, 
-#                 u.role_id,
-#                 p.program_name,
-#                 sem.sem_no
-#             FROM user_account u
-#             LEFT JOIN student_academic_info sai ON u.user_id = sai.student_id
-#             LEFT JOIN program p ON sai.program_id = p.id
-#             LEFT JOIN semester sem ON sai.semester_id = sem.id
-#             WHERE 1=1
-#         """
-#         params = []
-
-#         # 3. Apply the Funnel Filters (The Path to Execution!)
-#         if search:
-#             sql += " AND (u.user_name LIKE %s OR u.email LIKE %s)"
-#             params.extend([f"%{search}%", f"%{search}%"])
-
-#         if school != 'All':
-#             # Note: Ensure your 'program' table has a column for school_name
-#             # If it's stored differently, we can adjust this line
-#             sql += " AND p.school_name = %s" 
-#             params.append(school)
-
-#         if branch != 'All':
-#             sql += " AND p.program_name = %s"
-#             params.append(branch)
-
-#         if semester != 'All':
-#             sql += " AND sem.sem_no = %s"
-#             params.append(semester)
-
-#         sql += " ORDER BY u.role_id ASC, u.user_name ASC"
-
-#         cursor.execute(sql, tuple(params))
-#         users = cursor.fetchall()
-
-#         # Translate role IDs for the UI
-#         role_map = {1: 'Student', 2: 'Professor', 3: 'Admin'}
-#         for user in users:
-#             user['role_name'] = role_map.get(user['role_id'], 'Unknown')
-
-#         return jsonify(users), 200
-
-#     except Exception as e:
-#         print(f"Error fetching users: {e}")
-#         return jsonify({"error": "Failed to fetch users"}), 500
-#     finally:
-#         cursor.close()
-#         conn.close()
 @admin_bp.route('/users', methods=['GET'])
 def get_all_users():
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Capture filters from React
         search = request.args.get('search', '')
-        school = request.args.get('school', 'All')     # This will now receive an ID (e.g., '1')
-        branch = request.args.get('branch', 'All')     # This will receive 'B.Tech CSE'
-        semester = request.args.get('semester', 'All') # This will receive '6'
+        school = request.args.get('school', 'All')     
+        branch = request.args.get('branch', 'All')     
+        semester = request.args.get('semester', 'All') 
+        division = request.args.get('division', 'All')
+        batch = request.args.get('batch', 'All')
 
-        # 2. Build the query matching your EXACT schema screenshots
+        # Cleaned SQL query matching your actual table structure
         sql = """
             SELECT 
                 u.user_id, u.user_name, u.email, u.role_id, 
                 r.role AS role_name, 
-                p.program_name, sem.sem_no
+                p.program_name, sem.sem_no, d.division
             FROM user_account u
             LEFT JOIN role r ON u.role_id = r.id
             LEFT JOIN student_academic_info sai ON u.user_id = sai.student_id
             LEFT JOIN program p ON sai.program_id = p.id
             LEFT JOIN semester sem ON sai.semester_id = sem.id
+            LEFT JOIN division d ON sai.division_id = d.id
             WHERE 1=1
         """
         params = []
 
-        # 3. The Funnel Logic
         if search:
             sql += " AND (u.user_name LIKE %s OR u.email LIKE %s)"
             params.extend([f"%{search}%", f"%{search}%"])
         
         if school != 'All':
-            sql += " AND p.school_id = %s"  # MATCHES IMAGE 1
+            sql += " AND p.school_id = %s"  
             params.append(school)
 
         if branch != 'All':
-            sql += " AND p.program_name = %s" # MATCHES IMAGE 1
+            sql += " AND p.program_name = %s" 
             params.append(branch)
 
         if semester != 'All':
-            sql += " AND sem.sem_no = %s"   # MATCHES IMAGE 3
+            sql += " AND sem.sem_no = %s"   
             params.append(semester)
 
-        sql += " ORDER BY u.role_id ASC"
+        if division != 'All':
+            sql += " AND d.division = %s"
+            params.append(division)
 
-        print(f"EXECUTING SQL: {sql}")
-        print(f"WITH PARAMS: {params}")
+        sql += " ORDER BY u.role_id ASC"
 
         cursor.execute(sql, tuple(params))
         users = cursor.fetchall()
@@ -195,6 +108,7 @@ def get_all_users():
         cursor.close()
         conn.close()
 
+
 # ---------------------------------------------------------
 # 3. THE DEEP PROFILE ROUTE (For the Edit Button Modal)
 # ---------------------------------------------------------
@@ -203,7 +117,6 @@ def get_user_details(user_id):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Grab the basic info from the security gate
         cursor.execute("SELECT user_id, user_name, email, role_id FROM user_account WHERE user_id = %s", (user_id,))
         base_user = cursor.fetchone()
         
@@ -213,24 +126,25 @@ def get_user_details(user_id):
         role_id = base_user['role_id']
         email = base_user['email']
         
-        # 2. Translate the Role
         role_map = {1: 'Student', 2: 'Professor', 3: 'Admin'}
         base_user['role_name'] = role_map.get(role_id, 'Unknown')
 
-        # 3. Fetch the "Deep Data" based on their role using JOINs
         profile_data = {}
         
         if role_id == 1: 
-            # It's a Student! Join with academic_info, program, and semester.
             sql = """
                 SELECT 
                     s.*, 
                     p.program_name AS program, 
-                    sem.sem_no AS semester
+                    sem.sem_no AS semester,
+                    d.division,
+                    b.batch_no
                 FROM student s
                 LEFT JOIN student_academic_info sai ON s.id = sai.student_id
                 LEFT JOIN program p ON sai.program_id = p.id
                 LEFT JOIN semester sem ON sai.semester_id = sem.id
+                LEFT JOIN division d ON sai.division_id = d.id
+                LEFT JOIN batch b ON sai.batch_id = b.id
                 WHERE s.email = %s
             """
             cursor.execute(sql, (email,))
@@ -239,7 +153,6 @@ def get_user_details(user_id):
                 profile_data = student_data
                 
         elif role_id == 2: 
-            # It's a Professor! Join with employee_school_department and department.
             sql = """
                 SELECT 
                     e.*, 
@@ -254,7 +167,6 @@ def get_user_details(user_id):
             if prof_data:
                 profile_data = prof_data
 
-        # 4. Package it all up and send it to React
         return jsonify({
             "account": base_user,
             "profile": profile_data
@@ -267,30 +179,33 @@ def get_user_details(user_id):
         cursor.close()
         conn.close()
 
+
 # ---------------------------------------------------------
-# 4. THE BULK UPLOAD ROUTE (The Mail Sorter)
+# 4. THE HIERARCHICAL BULK UPLOAD ROUTE (With Target Micro-Cohort Mapping)
 # ---------------------------------------------------------
 @admin_bp.route('/users/upload', methods=['POST'])
 def upload_roster():
-    # 1. Check if React actually sent a file
     if 'file' not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files['file']
+    program_id = request.form.get('program_id')
+    semester_id = request.form.get('semester_id')
+    division_id = request.form.get('division_id')
+    batch_id = request.form.get('batch_id')
+
+    if not all([program_id, semester_id, division_id, batch_id]):
+        return jsonify({"error": "Target academic context (Branch, Semester, Division, Batch) is required for upload"}), 400
+
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
 
     try:
-        # 1. Read the file
         if file.filename.endswith('.csv'):
             df = pd.read_csv(file)
         else:
             df = pd.read_excel(file)
 
-        # --- NEW: Print exactly what columns Python sees to the terminal ---
-        print(f"DEBUG - Found these columns in the file: {df.columns.tolist()}")
-
-        # --- NEW: Clean the headers (remove hidden spaces and make lowercase) ---
         df.columns = df.columns.str.strip().str.lower()
 
         conn = get_db_connection()
@@ -299,85 +214,87 @@ def upload_roster():
         success_count = 0
         skipped_count = 0
 
-        # 3. The Sorter Loop
         for index, row in df.iterrows():
-            # Because we cleaned the headers, we now safely look for lowercase
             email = row.get('email')
             name = row.get('name')
             
-            # --- NEW: Smarter check for empty rows (handles hidden spaces in Excel) ---
             if pd.isna(email) or pd.isna(name) or str(email).strip() == '' or str(name).strip() == '':
                 continue
 
-            # Action A: Check for duplicates
+            # Check duplicate in user_account
             cursor.execute("SELECT user_id FROM user_account WHERE email = %s", (email,))
             if cursor.fetchone():
                 skipped_count += 1
                 continue 
 
-            # Action B: Insert into Security Gate
             default_password = "Gsfc@123"
             hashed_pw = generate_password_hash(default_password) 
             
+            # Insert into Security Gate (Role ID 1 = Student)
             cursor.execute(
                 "INSERT INTO user_account (user_name, email, password_hash, role_id) VALUES (%s, %s, %s, %s)",
                 (name, email, hashed_pw, 1) 
             )
-            
-            # Action C: Grab ID and insert into Student folder
             new_user_id = cursor.lastrowid 
+        
+            # Insert into student table
             cursor.execute("INSERT INTO student (id, email) VALUES (%s, %s)", (new_user_id, email))
             
+            # Link to the targeted micro-cohort via student_academic_info
+            cursor.execute(
+                """INSERT INTO student_academic_info (student_id, program_id, semester_id, division_id, batch_id) 
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (new_user_id, program_id, semester_id, division_id, batch_id)
+            )
+
             success_count += 1
 
         conn.commit()
         
         return jsonify({
-            "message": f"Upload complete! Added {success_count} students. Skipped {skipped_count} duplicates."
+            "message": f"Upload complete! Added {success_count} students to target micro-cohort. Skipped {skipped_count} duplicates."
         }), 200
 
     except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
         print(f"Error processing upload: {e}")
-        return jsonify({"error": "Failed to process file"}), 500
+        return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
     finally:
         if 'conn' in locals():
             cursor.close()
             conn.close()
 
-#5. THE DELETE USER ROUTE (For the Red Button of Doom)
+
+# 5. THE DELETE USER ROUTE
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # 1. Delete from dependent tables first (to avoid Foreign Key crashes)
         cursor.execute("DELETE FROM student_academic_info WHERE student_id = %s", (user_id,))
-        
-        # 2. Delete from the main user table
         cursor.execute("DELETE FROM user_account WHERE user_id = %s", (user_id,))
-        
-        # 3. Commit the changes permanently to MySQL
         conn.commit()
         return jsonify({"message": f"User #{user_id} deleted successfully."}), 200
 
     except Exception as e:
-        conn.rollback() # If something goes wrong, undo the deletion
+        conn.rollback() 
         print(f"DELETE ERROR: {e}")
         return jsonify({"error": "Failed to delete user."}), 500
     finally:
         cursor.close()
         conn.close()
 
+
 @admin_bp.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     data = request.json
     new_name = data.get('user_name')
-    new_role = data.get('role_id')  # 1: Student, 2: Professor, 3: Admin
+    new_role = data.get('role_id')  
 
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Update their name and role in the database
         cursor.execute("""
             UPDATE user_account 
             SET user_name = %s, role_id = %s 
@@ -394,4 +311,372 @@ def update_user(user_id):
     finally:
         cursor.close()
         conn.close()
-#Priyanka
+
+
+# ==========================================
+# --- ADMIN SETUP: SCHOOLS ---
+# ==========================================
+@admin_bp.route('/setup/schools', methods=['GET'])
+def get_schools():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT id, school_name AS name FROM school")
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/schools', methods=['POST'])
+def add_school():
+    data = request.get_json()
+    school_name_input = data.get('name')
+    if not school_name_input:
+        return jsonify({"error": "School name is required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO school (school_name) VALUES (%s)", (school_name_input,))
+        conn.commit()
+        return jsonify({"message": "School added successfully", "id": cursor.lastrowid, "name": school_name_input}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/schools/<int:school_id>', methods=['DELETE'])
+def delete_school(school_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM school WHERE id = %s", (school_id,))
+        conn.commit()
+        return jsonify({"message": "School deleted successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Cannot delete school. Ensure no branches or students are attached."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# --- ADMIN SETUP: PROGRAMS (BRANCHES) ---
+# ==========================================
+@admin_bp.route('/setup/programs', methods=['GET'])
+def get_programs():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT id, program_name AS name, school_id FROM program")
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/programs', methods=['POST'])
+def add_program():
+    data = request.get_json()
+    program_name = data.get('name')
+    school_id = data.get('school_id')
+    if not program_name or not school_id:
+        return jsonify({"error": "Program name and Parent School ID are required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO program (program_name, school_id) VALUES (%s, %s)", (program_name, school_id))
+        conn.commit()
+        return jsonify({"message": "Program added successfully", "id": cursor.lastrowid, "name": program_name, "school_id": school_id}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/programs/<int:program_id>', methods=['DELETE'])
+def delete_program(program_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM program WHERE id = %s", (program_id,))
+        conn.commit()
+        return jsonify({"message": "Program deleted successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Cannot delete program. It may have semesters or students attached."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# --- ADMIN SETUP: SEMESTERS ---
+# ==========================================
+@admin_bp.route('/setup/program_semesters', methods=['GET'])
+def get_program_semesters():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("""
+            SELECT ps.program_id, ps.semester_id, s.sem_no 
+            FROM program_semester ps
+            JOIN semester s ON ps.semester_id = s.id
+            ORDER BY s.sem_no ASC
+        """)
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/program_semesters', methods=['POST'])
+def add_program_semester():
+    data = request.get_json()
+    program_id = data.get('program_id')
+    sem_no = data.get('sem_no')
+    if not program_id or not sem_no:
+        return jsonify({"error": "Program ID and Semester Number are required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT id FROM semester WHERE sem_no = %s", (sem_no,))
+        sem_result = cursor.fetchone()
+        
+        if sem_result:
+            semester_id = sem_result['id']
+        else:
+            cursor.execute("INSERT INTO semester (sem_no) VALUES (%s)", (sem_no,))
+            semester_id = cursor.lastrowid
+            
+        cursor.execute("SELECT * FROM program_semester WHERE program_id = %s AND semester_id = %s", (program_id, semester_id))
+        if cursor.fetchone():
+            return jsonify({"error": "This semester is already linked to this program"}), 400
+            
+        cursor.execute("INSERT INTO program_semester (program_id, semester_id) VALUES (%s, %s)", (program_id, semester_id))
+        conn.commit()
+        
+        return jsonify({"message": "Semester linked successfully", "program_id": program_id, "semester_id": semester_id, "sem_no": sem_no}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/program_semesters/<int:program_id>/<int:semester_id>', methods=['DELETE'])
+def delete_program_semester(program_id, semester_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM program_semester WHERE program_id = %s AND semester_id = %s", (program_id, semester_id))
+        conn.commit()
+        return jsonify({"message": "Semester unlinked successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Cannot delete this mapping. It is likely tied to active divisions or batches."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# --- ADMIN SETUP: DIVISIONS & BATCHES ---
+# ==========================================
+@admin_bp.route('/setup/mappings', methods=['GET'])
+def get_mappings():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("""
+            SELECT m.program_id, m.semester_id, m.division_id, m.batch_id,
+                   s.sem_no, d.division, b.batch_no
+            FROM program_semester_division_batch m
+            JOIN semester s ON m.semester_id = s.id
+            JOIN division d ON m.division_id = d.id
+            JOIN batch b ON m.batch_id = b.id
+            ORDER BY s.sem_no ASC, d.division ASC, b.batch_no ASC
+        """)
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/mappings', methods=['POST'])
+def add_mapping():
+    data = request.get_json()
+    program_id = data.get('program_id')
+    semester_id = data.get('semester_id')
+    div_input = data.get('division')
+    batch_input = data.get('batch_no')
+    
+    if not all([program_id, semester_id, div_input, batch_input]):
+        return jsonify({"error": "Program, Semester, Division, and Batch are required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT id FROM division WHERE division = %s", (div_input,))
+        div_res = cursor.fetchone()
+        if div_res:
+            division_id = div_res['id']
+        else:
+            cursor.execute("INSERT INTO division (division) VALUES (%s)", (div_input,))
+            division_id = cursor.lastrowid
+            
+        cursor.execute("SELECT id FROM batch WHERE batch_no = %s", (batch_input,))
+        batch_res = cursor.fetchone()
+        if batch_res:
+            batch_id = batch_res['id']
+        else:
+            cursor.execute("INSERT INTO batch (batch_no) VALUES (%s)", (batch_input,))
+            batch_id = cursor.lastrowid
+            
+        cursor.execute("""
+            SELECT * FROM program_semester_division_batch 
+            WHERE program_id = %s AND semester_id = %s AND division_id = %s AND batch_id = %s
+        """, (program_id, semester_id, division_id, batch_id))
+        
+        if cursor.fetchone():
+            return jsonify({"error": "This specific Division and Batch is already mapped to this Semester"}), 400
+            
+        cursor.execute("""
+            INSERT INTO program_semester_division_batch 
+            (program_id, semester_id, division_id, batch_id) 
+            VALUES (%s, %s, %s, %s)
+        """, (program_id, semester_id, division_id, batch_id))
+        conn.commit()
+        
+        return jsonify({"message": "Cohort mapped successfully"}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/mappings/<int:p_id>/<int:s_id>/<int:d_id>/<int:b_id>', methods=['DELETE'])
+def delete_mapping(p_id, s_id, d_id, b_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            DELETE FROM program_semester_division_batch 
+            WHERE program_id = %s AND semester_id = %s AND division_id = %s AND batch_id = %s
+        """, (p_id, s_id, d_id, b_id))
+        conn.commit()
+        return jsonify({"message": "Cohort unlinked successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Cannot delete this mapping. Students may be enrolled in it."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# --- ADMIN SETUP: COURSES ---
+# ==========================================
+@admin_bp.route('/setup/courses', methods=['GET'])
+def get_courses():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT id, course_name, short_course_name FROM course")
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/courses', methods=['POST'])
+def add_course():
+    data = request.get_json()
+    course_name = data.get('course_name')
+    short_name = data.get('short_course_name')
+    if not course_name:
+        return jsonify({"error": "Course name is required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO course (course_name, short_course_name) VALUES (%s, %s)", (course_name, short_name))
+        conn.commit()
+        return jsonify({"message": "Course created successfully", "id": cursor.lastrowid, "course_name": course_name}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/semester_courses', methods=['GET'])
+def get_semester_courses():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("""
+            SELECT sc.semester_id, sc.course_id, c.course_name, c.short_course_name, s.sem_no
+            FROM semester_course sc
+            JOIN course c ON sc.course_id = c.id
+            JOIN semester s ON sc.semester_id = s.id
+        """)
+        return jsonify(cursor.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/semester_courses', methods=['POST'])
+def link_semester_course():
+    data = request.get_json()
+    semester_id = data.get('semester_id')
+    course_id = data.get('course_id')
+    if not semester_id or not course_id:
+        return jsonify({"error": "Semester ID and Course ID are required"}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT * FROM semester_course WHERE semester_id = %s AND course_id = %s", (semester_id, course_id))
+        if cursor.fetchone():
+            return jsonify({"error": "This course is already linked to this semester"}), 400
+            
+        cursor.execute("INSERT INTO semester_course (semester_id, course_id) VALUES (%s, %s)", (semester_id, course_id))
+        conn.commit()
+        return jsonify({"message": "Course linked to semester successfully"}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@admin_bp.route('/setup/semester_courses/<int:sem_id>/<int:crs_id>', methods=['DELETE'])
+def unlink_semester_course(sem_id, crs_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM semester_course WHERE semester_id = %s AND course_id = %s", (sem_id, crs_id))
+        conn.commit()
+        return jsonify({"message": "Course unlinked successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "Cannot unlink course."}), 500
+    finally:
+        cursor.close()
+        conn.close()

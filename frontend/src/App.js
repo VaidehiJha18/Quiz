@@ -5,6 +5,7 @@ import QuizResult from './pages/QuizResult';
 import AdminManageUsersPage from './pages/AdminManageUsersPage';
 import AdminRoute from './components/layout/AdminRoute';
 import AdminSystemSetupPage from './pages/AdminSystemSetupPage';
+import AdminDashboardHub from './pages/AdminDashboardHub';
 
 // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
 import ProfessorLayout from './components/layout/ProfessorLayout';
@@ -33,7 +34,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 
 function App() {
-  // return <StudentDashboard />;
   return (
     <div className="App">
       <Routes>
@@ -48,12 +48,11 @@ function App() {
         <Route path="/student/results" element={<ResultsPage role="student" />} />
         <Route path="/take-quiz/:token" element={<Quiz />} />
 
-        {/* Quiz Preview Route, for some reason it doesn't work when grouped with professor routes but works when outside it */}
+        {/* Quiz Preview Route */}
         <Route path="/professor/preview/:token" element={<QuizPreviewPage />} />
         <Route path="/result/:attemptId" element={<QuizResult />} />
          
-        {/* --- Professor Routes (Now wrapped in the new layout) --- */}
-        {/* ✅ 2. WRAP all professor pages inside the ProfessorLayout route */}
+        {/* --- Professor Routes --- */}
         <Route path="/professor" element={<ProfessorLayout />}>
           <Route path="dashboard" element={<ProfessorDashboard />} />
           <Route path="quizzes" element={<ViewQuizzesPage />} />
@@ -62,25 +61,21 @@ function App() {
 
           <Route path="questions/add" element={<EditQuestionsPage isNew />} />
           <Route path="questions/edit/:questionId" element={<EditQuestionsPage />} />
-          <Route path="results" element={<ResultsPage role="professor" />} />      
+          <Route path="results" element={<ResultsPage role="professor" />} />     
           <Route path="generate-quiz" element={<GenerateQuizPage />} />
           <Route path="/professor/analytics" element={<ProfessorAnalyticsPage />} />
           <Route path="students" element={<ManageStudentsPage />} />
-          
-          
-          {/* You will need to create components for these new pages */}
         </Route>
 
-        <Route path="*" element={<h1>404: Page Not Found</h1>} />
-        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-        <Route path="/admin/users" element={<AdminManageUsersPage />} />
-        <Route path="*" element={<h1>404: Page Not Found</h1>} />
-        {/* --- Admin Routes (NOW SECURED) --- */}
+        {/* ========================================================= */}
+        {/* --- Admin Routes (CLEANED, SECURED & MAPPED TO CARD HUB) --- */}
+        {/* ========================================================= */}
         <Route 
           path="/admin/dashboard" 
           element={
             <AdminRoute>
-              <AdminDashboardPage />
+              {/* 🌟 HIGHLIGHT: Replaced old AdminDashboardPage with AdminDashboardHub card hub */}
+              <AdminDashboardHub />
             </AdminRoute>
           } 
         />
@@ -93,6 +88,7 @@ function App() {
             </AdminRoute>
           } 
         />
+        
         <Route 
           path="/admin/setup" 
           element={
@@ -101,11 +97,12 @@ function App() {
             </AdminRoute>
           } 
         />
-      </Routes>
 
+        {/* Single unified 404 catch-all route at the very bottom */}
+        <Route path="*" element={<h1>404: Page Not Found</h1>} />
+      </Routes>
     </div>
   );
 }
-
 
 export default App;
