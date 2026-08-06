@@ -62,7 +62,7 @@ export default function QuizPage() {
 
       await submitQuiz(quizId, payload);
       alert(autoSubmitted
-        ? "Your quiz was auto-submitted due to a policy violation."
+        ? "Your quiz was auto-submitted due to policy violations."
         : "Quiz Submitted Successfully!"
       );
       navigate('/Student/Dashboard');
@@ -75,13 +75,18 @@ export default function QuizPage() {
     }
   }, [quiz, answers, isSubmitting, submitted, quizId, navigate]);
 
-  
+  // Handle anti-cheat violation updates: ONLY submit on Strike 3
+  const handleViolationUpdate = useCallback((reason, count, isFinalViolation) => {
+    if (isFinalViolation === true) {
+      handleSubmit(true, reason);
+    }
+  }, [handleSubmit]);
 
-  // ── Anti-cheat: get FreezeOverlay from the hook ───────────────────────────
-  const { FreezeOverlay } = useAntiCheat(
+  // Hook instance
+  const { AntiCheatOverlays } = useAntiCheat(
     isQuizStarted,
     submitted,
-    (reason) => handleSubmit(true, reason)
+    handleViolationUpdate
   );
 
   // Enter fullscreen + start quiz
@@ -95,7 +100,6 @@ export default function QuizPage() {
         })
         .catch(() => alert("Fullscreen is required. Please allow it and try again."));
     } else {
-      // Fallback for browsers without fullscreen support
       setIsQuizStarted(true);
       startTimeRef.current = new Date();
     }
@@ -105,7 +109,6 @@ export default function QuizPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
-  // Loading
   if (!quiz) {
     return (
       <>
@@ -118,7 +121,6 @@ export default function QuizPage() {
     );
   }
 
-  // Pre-start screen
   if (!isQuizStarted) {
     return (
       <>
@@ -158,11 +160,9 @@ export default function QuizPage() {
     );
   }
 
-  // Active quiz
   return (
     <>
-      {/* ✅ FreezeOverlay renders here — sits on top of everything when triggered */}
-      <FreezeOverlay />
+      <AntiCheatOverlays />
 
       <Header />
       <main className="page-container">
@@ -203,4 +203,3 @@ export default function QuizPage() {
     </>
   );
 }
-

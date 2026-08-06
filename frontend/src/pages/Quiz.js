@@ -5,33 +5,44 @@ import QuizTimer from '../components/QuizTimer';
 import './Quiz.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Anti-cheat hook — all lockdown logic lives here, cleanly separated
+// Anti-cheat hook — 3-strike policy with ESC / Fullscreen detection
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 function useAntiCheat(isActive, submitted, onViolation) {
   const violationCount = useRef(0);
-  const isProcessing = useRef(false); 
-  const MAX_VIOLATIONS = 1;
+  const isCooldown = useRef(false); 
+  const MAX_VIOLATIONS = 3;
+
+  const [warningModal, setWarningModal] = useState({ open: false, reason: '' });
 
   const handleViolation = useCallback((reason) => {
-    if (!isActive || submitted || isProcessing.current) return;
+    if (!isActive || submitted || isCooldown.current) return;
     
-    isProcessing.current = true; 
-    violationCount.current += 1;
+    // Lock for 1.5 seconds to prevent multi-event firing on a single action
+    isCooldown.current = true;
+    setTimeout(() => { isCooldown.current = false; }, 1500);
 
-    if (violationCount.current >= MAX_VIOLATIONS) {
+    violationCount.current += 1;
+    const currentCount = violationCount.current;
+
+    if (currentCount >= MAX_VIOLATIONS) {
+      setWarningModal({ open: false, reason: '' });
       onViolation(reason);
     } else {
-      const remaining = MAX_VIOLATIONS - violationCount.current;
-      alert(`⚠️ Warning ${violationCount.current}/${MAX_VIOLATIONS}: Do not leave the quiz!\n${remaining} warning(s) left before auto-submit.`);
+      setWarningModal({ open: true, reason });
     }
 
-    setTimeout(() => {
-      isProcessing.current = false;
-    }, 1000);
-
   }, [isActive, submitted, onViolation]);
+
+  const dismissWarning = () => {
+    setWarningModal({ open: false, reason: '' });
+
+    // ➕ Automatically re-enter fullscreen when student acknowledges the warning
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    }
+  };
 
   // 1. Block right-click
   useEffect(() => {
@@ -41,10 +52,14 @@ function useAntiCheat(isActive, submitted, onViolation) {
     return () => document.removeEventListener('contextmenu', block);
   }, [isActive]);
 
-  // 2. Block keyboard shortcuts
+  // 2. Block keyboard shortcuts & catch ESC key
   useEffect(() => {
     if (!isActive) return;
     const block = (e) => {
+      // ➕ Catch ESC key manually if pressed
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        handleViolation('exit_fullscreen');
+      }
       if (e.key === 'F12') { e.preventDefault(); return; }
       if (e.ctrlKey || e.metaKey) {
         const blocked = ['C','V','X','U','S','P','A','F'];
@@ -58,27 +73,29 @@ function useAntiCheat(isActive, submitted, onViolation) {
     return () => document.removeEventListener('keydown', block);
   }, [isActive, handleViolation]);
 
-  // 3. Tab switch / window blur
+  // 3. Tab switch
   useEffect(() => {
     if (!isActive) return;
     const onVisibility = () => { if (document.hidden) handleViolation('tab_switch'); };
-    const onBlur = () => handleViolation('window_blur');
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('blur', onBlur);
-    };
+    return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [isActive, handleViolation]);
 
-  // 4. Fullscreen exit
+  // 4. ➕ Fullscreen Exit Detection (Listens for ESC / exiting fullscreen)
   useEffect(() => {
     if (!isActive) return;
     const onFSChange = () => {
-      if (!document.fullscreenElement) handleViolation('exit_fullscreen');
+      // If user exits fullscreen mode, trigger a violation
+      if (!document.fullscreenElement) {
+        handleViolation('exit_fullscreen');
+      }
     };
     document.addEventListener('fullscreenchange', onFSChange);
-    return () => document.removeEventListener('fullscreenchange', onFSChange);
+    document.addEventListener('webkitfullscreenchange', onFSChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFSChange);
+      document.removeEventListener('webkitfullscreenchange', onFSChange);
+    };
   }, [isActive, handleViolation]);
 
   // 5. Block copy / cut / text selection
@@ -102,6 +119,48 @@ function useAntiCheat(isActive, submitted, onViolation) {
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [isActive, submitted]);
+
+  // Pop-up warning overlay rendered for strikes 1 & 2
+  const AntiCheatModal = () => {
+    if (!warningModal.open) return null;
+
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 99998,
+        backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'system-ui, sans-serif'
+      }}>
+        <div style={{
+          background: '#fff', borderRadius: '12px', padding: '28px',
+          textAlign: 'center', maxWidth: '380px', width: '90%',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+        }}>
+          <div style={{ fontSize: '44px', marginBottom: '12px' }}>⚠️</div>
+          <h3 style={{ color: '#e67e22', margin: '0 0 8px', fontSize: '20px' }}>
+            Violation Warning ({violationCount.current}/3)
+          </h3>
+          <p style={{ color: '#444', fontSize: '14px', margin: '0 0 18px', lineHeight: 1.5 }}>
+            A violation was recorded: <strong>{warningModal.reason.replace('_', ' ')}</strong>.
+            <br /><br />
+            You have <strong>{3 - violationCount.current}</strong> warning(s) left before auto-submit.
+          </p>
+          <button 
+            onClick={dismissWarning}
+            style={{
+              background: '#e67e22', color: '#fff', border: 'none',
+              padding: '10px 24px', borderRadius: '6px', fontSize: '14px',
+              fontWeight: '600', cursor: 'pointer', width: '100%'
+            }}
+          >
+            I Understand & Re-enter Fullscreen
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return { AntiCheatModal, violationCount: violationCount.current };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,8 +216,8 @@ function LockdownStartScreen({ quizData, onStart }) {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: '#f39c12' }}>1</div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Violation</div>
+            <div style={{ fontSize: '28px', fontWeight: 800, color: '#f39c12' }}>3</div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Violations</div>
           </div>
         </div>
 
@@ -176,11 +235,10 @@ function LockdownStartScreen({ quizData, onStart }) {
           </div>
           {[
             'Quiz runs in mandatory fullscreen mode',
-            'Switching tabs or windows = 1 violation ',
-            'Exiting fullscreen = 1 violation ',
-            'Alt+Tab or minimizing = 1 violation ',
-            '1 violation → quiz auto-submits immediately',
-            'Right-click and copy are disabled',
+            'Switching tabs or minimizing = 1 violation',
+            'Warnings display for violations 1 and 2',
+            '3rd violation = quiz auto-submits immediately',
+            'Right-click and copy text are disabled',
           ].map((rule, i) => (
             <div key={i} style={{
               fontSize: '13px', color: 'rgba(255,255,255,0.7)',
@@ -236,7 +294,7 @@ const Quiz = () => {
   const [visitedQuestions, setVisitedQuestions] = useState(new Set([0]));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [isQuizStarted, setIsQuizStarted] = useState(false); // ← lockdown gate
+  const [isQuizStarted, setIsQuizStarted] = useState(false);
 
   const startTimeRef = useRef(null);
 
@@ -265,11 +323,10 @@ const Quiz = () => {
     }
   }, [currentQuestion, quizData]);
 
-  // Submit handler — defined before useAntiCheat so it can be passed in
+  // Submit handler
   const handleSubmit = useCallback(async (autoSubmitted = false, reason = '') => {
     if (submitted || isSubmitting || !quizData) return;
 
-    // ✅ NEW: Alert the user immediately if time is up before confirming submission
     if (reason === 'time_up') {
         alert("⏳ Time's Up! Your quiz is being automatically submitted. Your answers have been saved.");
     } else if (!autoSubmitted && !window.confirm("Are you sure you want to submit?")) {
@@ -279,7 +336,6 @@ const Quiz = () => {
     setIsSubmitting(true);
     setSubmitted(true);
 
-    // Exit fullscreen cleanly
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -305,11 +361,11 @@ const Quiz = () => {
       };
 
       await submitStudentQuiz(payload);
-      // ✅ NEW: Show specific alerts based on HOW it was submitted
+
       if (reason === 'time_up') {
-          // Do nothing here, we already alerted them at the start of the function
+          // Handled above
       } else if (autoSubmitted) {
-          alert("⚠️ Your quiz was auto-submitted due to a policy violation.");
+          alert("⚠️ Your quiz was auto-submitted due to reaching 3 policy violations.");
       } else {
           alert("✅ Quiz Submitted Successfully!");
       }
@@ -324,8 +380,12 @@ const Quiz = () => {
     }
   }, [answers, isSubmitting, quizData, submitted, token, navigate]);
 
-  // ── Activate anti-cheat only after quiz is started ──
-  useAntiCheat(isQuizStarted, submitted, (reason) => handleSubmit(true, reason));
+  // Activate anti-cheat hook
+  const { AntiCheatModal } = useAntiCheat(
+    isQuizStarted, 
+    submitted, 
+    (reason) => handleSubmit(true, reason)
+  );
 
   // Enter fullscreen and start quiz
   const enterLockdown = useCallback(() => {
@@ -334,13 +394,12 @@ const Quiz = () => {
       el.requestFullscreen()
         .then(() => {
           setIsQuizStarted(true);
-          startTimeRef.current = new Date(); // timer starts NOW
+          startTimeRef.current = new Date();
         })
         .catch(() => {
           alert("Fullscreen access is required to start this quiz. Please allow fullscreen and try again.");
         });
     } else {
-      // Fallback for browsers without fullscreen API
       setIsQuizStarted(true);
       startTimeRef.current = new Date();
     }
@@ -362,16 +421,13 @@ const Quiz = () => {
     handleSubmit(true, 'time_up');
   }, [handleSubmit]);
 
-  // ── Loading / error states ──
   if (loading) return <div className="loading">Loading Quiz Questions...</div>;
   if (!quizData || !quizData.questions) return <div className="error">Quiz not found.</div>;
 
-  // ── Pre-start lockdown screen ──
   if (!isQuizStarted) {
     return <LockdownStartScreen quizData={quizData} onStart={enterLockdown} />;
   }
 
-  // ── Active quiz ──
   const totalQuestions = quizData.questions.length;
   const answeredCount = answers.filter(a => a !== null).length;
   const allAnswered = answeredCount === totalQuestions;
@@ -390,6 +446,9 @@ const Quiz = () => {
 
   return (
     <div className="quiz-page-wrapper">
+      {/* Warning modal for strikes 1 & 2 */}
+      <AntiCheatModal />
+
       <header className="quiz-top-header">
         <div className="header-left">
           <h2 className="quiz-title-text">{quizData.quiz?.quiz_title || "Quiz"}</h2>
