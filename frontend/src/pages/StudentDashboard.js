@@ -417,7 +417,7 @@ const StudentDashboard = () => {
                     duration: formatTimeSlot(quiz.start_time, quiz.end_time), // Displays Start - End Time
                     professor: quiz.teacher || 'Prof. Unknown',               // Displays Professor Name
                     dueDate: quiz.start_time ? new Date(quiz.start_time).toLocaleDateString() : 'Today',
-                    status: 'available',
+                    status: quiz.computed_status || 'available',
                     token: quiz.quiz_token 
                   }} 
                   onStartQuiz={() => handleStartQuiz(quiz.quiz_token)} 

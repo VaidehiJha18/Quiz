@@ -443,27 +443,28 @@ def get_professor_quizzes(teacher_id):
     try:
         sql = """
             SELECT 
-                q.id, 
-                q.quiz_title, 
-                q.teacher, 
-                q.school, 
-                q.department, 
-                q.program, 
-                q.semester, 
-                q.course, 
-                q.course_id, 
-                q.total_questions, 
-                q.time_limit,
-                q.quiz_status AS status, 
-                q.quiz_link, 
-                q.quiz_token AS token, 
-                q.start_time,
-                q.end_time,
-                q.created_at,
-                GROUP_CONCAT(d.division SEPARATOR ', ') AS published_divisions
+                 q.id, 
+                 q.quiz_title, 
+                 ua.user_name AS teacher, 
+                 q.school, 
+                 q.department, 
+                 q.program, 
+                 q.semester, 
+                 q.course, 
+                 q.course_id, 
+                 q.total_questions, 
+                 q.time_limit, 
+                 q.quiz_status AS status, 
+                 q.quiz_link, 
+                 q.quiz_token AS token, 
+                 q.start_time,
+                 q.end_time,
+                 q.created_at,
+                 GROUP_CONCAT(d.division SEPARATOR ', ') AS published_divisions
             FROM quizzes q
             LEFT JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             LEFT JOIN division d ON qscd.division_id = d.id
+            LEFT JOIN user_account ua ON q.teacher_id = ua.user_id AND ua.role_id = 2
             WHERE q.teacher_id = %s 
             GROUP BY q.id
             ORDER BY q.created_at DESC

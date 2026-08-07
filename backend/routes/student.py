@@ -36,26 +36,27 @@ def student_dashboard():
         # We added the "AND q.id NOT IN (...)" clause
         quiz_sql = """
             SELECT 
-                q.id, 
-                q.quiz_title, 
-                q.course, 
-                q.teacher, 
-                q.total_questions, 
-                q.time_limit, 
-                q.quiz_token,
-                q.quiz_status,
-                q.created_at,
-                q.start_time,
-                q.end_time
+                 q.id, 
+                 q.quiz_title, 
+                 q.course, 
+                 ua.user_name AS teacher, 
+                 q.total_questions, 
+                 q.time_limit, 
+                 q.quiz_token,
+                 q.quiz_status,
+                 q.created_at,
+                 q.start_time,
+                 q.end_time
             FROM quizzes q
             JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            LEFT JOIN user_account ua ON q.teacher_id = ua.user_id AND ua.role_id = 2
             WHERE 
-                q.quiz_status = 'Published'
-                AND qscd.semester_id = %s
-                AND qscd.division_id = %s
-                AND q.id NOT IN (
-                    SELECT quiz_id FROM student_quiz_attempt WHERE student_id = %s
-                )
+                 q.quiz_status = 'Published'
+                 AND qscd.semester_id = %s
+                 AND qscd.division_id = %s
+                 AND q.id NOT IN (
+                     SELECT quiz_id FROM student_quiz_attempt WHERE student_id = %s
+                 )
             ORDER BY q.start_time ASC
         """
         #  Pass student_id as the 3rd parameter
@@ -75,14 +76,18 @@ def student_dashboard():
                     start_val = datetime.fromisoformat(start_val.replace('T', ' ').replace('Z', ''))
                 if isinstance(end_val, str):
                     end_val = datetime.fromisoformat(end_val.replace('T', ' ').replace('Z', ''))
-
-                # Print comparison for terminal debugging
-                print(f"DEBUG: Checking Quiz '{q['quiz_title']}' | Start: {start_val} <= Now: {now} <= End: {end_val}")
-
-                # Skip if current system time is outside scheduled window
-                if not (start_val <= now <= end_val):
-                    print(f"DEBUG: Quiz '{q['quiz_title']}' skipped due to time window.")
+                
+                # Drop the quiz ONLY if it has expired
+                if now > end_val:
                     continue
+                
+                # Assign dynamic status for the frontend
+                if now < start_val:
+                    q['computed_status'] = 'upcoming'
+                else:
+                    q['computed_status'] = 'available'
+            else:
+                q['computed_status'] = 'available'
 
             # Format datetime objects back to ISO strings for React
             if isinstance(q.get('created_at'), datetime):
@@ -241,14 +246,14 @@ def get_student_quiz_history():
         # 1. Fetch Completed Quizzes
         completed_sql = """
             SELECT 
-                sqa.attempt_id,
-                q.quiz_title,
-                q.teacher,
-                qa.submit_time AS submit_time,
-                COALESCE(qa.total_score, 0) AS total_score,
-                q.total_questions,
-                'Completed' AS status,
-                1 AS is_published
+                 sqa.attempt_id,
+                 q.quiz_title,
+                 q.teacher,
+                 qa.submit_time AS submit_time,
+                 COALESCE(qa.total_score, 0) AS total_score,
+                 q.total_questions,
+                 'Completed' AS status,
+                 qa.is_published AS is_published 
             FROM student_quiz_attempt sqa
             JOIN quizzes q ON sqa.quiz_id = q.id
             JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id

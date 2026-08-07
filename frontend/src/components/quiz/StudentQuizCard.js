@@ -1,4 +1,5 @@
 import React from 'react';
+import './StudentQuizCard.css';
 
 const StudentQuizCard = ({ quiz, onStartQuiz }) => {
   
@@ -18,7 +19,7 @@ const StudentQuizCard = ({ quiz, onStartQuiz }) => {
         <div className="quiz-detail-item">
           <div className="detail-icon">⏱️</div>
           <span>
-            <span className="quiz-detail-label">Duration:</span> {quiz.duration}
+            <span className="quiz-detail-label">Window:</span> {quiz.duration}
           </span>
         </div>
         <div className="quiz-detail-item">
@@ -51,7 +52,7 @@ const StudentQuizCard = ({ quiz, onStartQuiz }) => {
       }}>
         <span>⚠️</span>
         <span>
-          Once you start, a <strong>{quiz.duration || quiz.time_limit} timer</strong> begins 
+          Once you start, a <strong>{quiz.time_limit ? `${quiz.time_limit} minute` : 'timed'} timer</strong> begins 
           and <strong>cannot be paused</strong>. The quiz auto-submits when time runs out.
         </span>
       </div>
