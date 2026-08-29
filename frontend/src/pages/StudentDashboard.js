@@ -119,8 +119,9 @@ body {
 .student-main-content {
   flex: 1;
   padding: 1.5rem 1rem;
-  overflow-y: visible !important;
-  height: auto !important;
+  overflow-y: auto !important;
+  height: 100vh !important;
+  padding-bottom: 4rem;
 }
 
 /* Top Bar */
@@ -490,15 +491,20 @@ const StudentDashboard = () => {
                                     fontSize: '0.88rem',
                                     display: 'inline-block'
                                 }}>
-                                    ❌ Missed / Expired
+                                     Missed / Expired
                                 </span>
                             ) : h.is_published ? (
-                                <Link 
-                                    to={`/result/${h.attempt_id}`}
-                                    className="btn-primary"
-                                >
-                                    📊 View Result
-                                </Link>
+                                <span style={{
+                                    background: '#d1fae5',
+                                    color: '#065f46',
+                                    padding: '0.5rem 1.2rem',
+                                    borderRadius: '20px',
+                                    fontWeight: '600',
+                                    fontSize: '0.88rem',
+                                    display: 'inline-block'
+                                }}>
+                                    ✅ Result Published
+                                </span>
                             ) : (
                                 <span style={{
                                     background: '#e2e8f0',
@@ -520,12 +526,59 @@ const StudentDashboard = () => {
         );
 
       case 'results':
+        // Filter out only the quizzes that the professor has published
+        const publishedResults = history.filter(h => h.is_published === 1 || h.is_published === true);
+        
+        if (publishedResults.length === 0) {
+          return (
+            <div className="quiz-cards-container">
+              <div className="empty-state" style={{ color: 'white', textAlign: 'center', padding: '3rem' }}>
+                <h3>No Results Yet</h3>
+                <p>Your professors haven't published any quiz results for you yet.</p>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="quiz-cards-container">
-            <div className="empty-state" style={{ color: 'white' }}>
-              <h3>Performance Analytics</h3>
-              <p>Detailed performance charts coming soon.</p>
-            </div>
+            <h2 style={{ color: 'white', textShadow: '1px 1px 3px rgba(0,0,0,0.2)', marginBottom: '1rem' }}>
+              My Published Results
+            </h2>
+            
+            {publishedResults.map(result => (
+              <div key={result.attempt_id} className="history-card" style={{ borderLeft: '6px solid #3498db' }}>
+                <div className="history-info">
+                  <h3>{result.quiz_title}</h3>
+                  <p><strong>Professor:</strong> {result.teacher || 'N/A'}</p>
+                  <p style={{ fontSize: '0.85rem', color: '#718096' }}>
+                    <strong>Submitted On:</strong> {new Date(result.submit_time).toLocaleString()}
+                  </p>
+                </div>
+                
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+                  <div style={{ 
+                      background: '#f0f4f8', 
+                      padding: '10px 20px', 
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1'
+                  }}>
+                    <span style={{ fontSize: '0.9rem', color: '#4a5568', display: 'block' }}>Score Achieved</span>
+                    <strong style={{ fontSize: '1.6rem', color: '#2c3e50' }}>
+                      {result.total_score} <span style={{ fontSize: '1rem', color: '#a0aec0' }}>/ {result.total_questions}</span>
+                    </strong>
+                  </div>
+                  
+                  <Link 
+                     to={`/result/${result.attempt_id}`}
+                     className="btn-primary"
+                     style={{ width: '100%' }}
+                  >
+                     📊 View Breakdown
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         );
 

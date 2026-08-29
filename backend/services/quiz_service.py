@@ -957,21 +957,33 @@ def submit_student_quiz(token, student_id, answers):
         total_score = 0
         response_data = [] # List to store tuples for batch insert
 
-        for q_id, opt_id in answers.items():
-            # Check if option is correct
-            # Assumes answer_map has 'is_correct' boolean
-            cursor.execute("SELECT is_correct FROM answer_map WHERE id = %s", (opt_id,))
+        # ❤️❤️❤️
+        for q_id, answer_val in answers.items():
+            # ✅ THE FIX: Match by ID OR Option Text to support any frontend payload
+            cursor.execute("""
+                SELECT id, is_correct 
+                FROM answer_map 
+                WHERE question_id = %s AND (id = %s OR option_text = %s)
+                LIMIT 1
+            """, (q_id, answer_val, str(answer_val)))
+            
             option = cursor.fetchone()
             
             marks = 0
-            if option and option['is_correct']:
-                # Get marks for this question
-                cursor.execute("SELECT marks FROM question_bank WHERE id = %s", (q_id,))
-                q_meta = cursor.fetchone()
-                marks = q_meta['marks'] if q_meta else 1
-                total_score += marks
+            real_opt_id = None
+
+            if option:
+                real_opt_id = option['id'] # Grab the real database ID
+                
+                # Check if it is correct (handles MySQL TINYINT returns: 1, '1', or True)
+                if option['is_correct'] in [1, '1', True, b'\x01']:
+                    # Get marks for this question
+                    cursor.execute("SELECT marks FROM question_bank WHERE id = %s", (q_id,))
+                    q_meta = cursor.fetchone()
+                    marks = q_meta['marks'] if (q_meta and q_meta['marks']) else 1
+                    total_score += marks
             
-            response_data.append((q_id, opt_id, marks))
+            response_data.append((q_id, real_opt_id, marks))
 
         # 3. Insert into quiz_attempt
         cursor.execute("""
@@ -986,12 +998,12 @@ def submit_student_quiz(token, student_id, answers):
             VALUES (%s, %s, %s)
         """, (student_id, quiz_id, attempt_id))
 
-        # 5. Store Responses (JSON logic stored relationally)
-        for q_id, opt_id, marks in response_data:
+        # 5. Store Responses with the REAL option ID
+        for q_id, real_opt_id, marks in response_data:
             cursor.execute("""
                 INSERT INTO attempt_response (attempt_id, question_id, selected_option_id, marks_awarded)
                 VALUES (%s, %s, %s, %s)
-            """, (attempt_id, q_id, opt_id, marks))
+            """, (attempt_id, q_id, real_opt_id, marks))
 
         conn.commit()
         return {"score": total_score, "attempt_id": attempt_id}
