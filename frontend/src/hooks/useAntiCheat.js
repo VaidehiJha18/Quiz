@@ -1,57 +1,91 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-/**
- * useAntiCheat
- * Returns { FreezeOverlay } — render this at the TOP of your QuizPage JSX.
- * On violation: screen visually freezes + blurs, countdown shows, then auto-submits.
- */
+
+let globalStrikeCount = 0;
+let globalCooldown = false;
+
 export default function useAntiCheat(isActive, submitted, onViolation) {
-  const violationCount = useRef(0);
+  const [violationsCount, setViolationsCount] = useState(0);
+  const [warningModal, setWarningModal] = useState({ open: false, reason: '' });
   const [isFrozen, setIsFrozen] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const countdownRef = useRef(null);
 
-  // Cleanup interval on unmount
+  const countdownRef = useRef(null);
+  const onViolationRef = useRef(onViolation);
+
+  useEffect(() => {
+    onViolationRef.current = onViolation;
+  }, [onViolation]);
+
+  // Reset counters when quiz starts
+  useEffect(() => {
+    if (isActive) {
+      globalStrikeCount = 0;
+      globalCooldown = false;
+    }
+  }, [isActive]);
+
   useEffect(() => () => clearInterval(countdownRef.current), []);
 
-  // Freeze screen + start countdown then call onViolation
+  // 🔒Strike 3: Freeze Screen & Auto-Submit Sequence
   const freezeAndSubmit = useCallback((reason) => {
     if (submitted || !isActive || isFrozen) return;
     setIsFrozen(true);
     setCountdown(3);
-    let count = 3;
+
+    let countTimer = 3;
     countdownRef.current = setInterval(() => {
-      count -= 1;
-      setCountdown(count);
-      if (count <= 0) {
+      countTimer -= 1;
+      setCountdown(countTimer);
+      if (countTimer <= 0) {
         clearInterval(countdownRef.current);
-        onViolation(reason);
+        if (onViolationRef.current) {
+          onViolationRef.current(reason, 3, true);
+        }
       }
     }, 1000);
-  }, [isActive, submitted, isFrozen, onViolation]);
+  }, [isActive, submitted, isFrozen]);
 
-  // // 3-strike system
-  // const handleViolation = useCallback((reason) => {
-  //   if (submitted || !isActive || isFrozen) return;
-  //   violationCount.current += 1;
-  //   if (violationCount.current >= 3) {
-  //     freezeAndSubmit(reason);
-  //   } else {
-  //     const left = 3 - violationCount.current;
-  //     alert(`Warning ${violationCount.current}/2: Stay on the quiz!\n${left} warning(s) left before auto-submit.`);
-  //   }
-  // }, [isActive, submitted, isFrozen, freezeAndSubmit]);
+  // Core Violation Handler
+  const triggerViolation = useCallback((reason) => {
+    if (!isActive || submitted || isFrozen || globalCooldown) return;
 
-  // Updated 1-strike system
-  const handleViolation = useCallback((reason) => {
-    if (submitted || !isActive || isFrozen) return;
-    
-    // Violation occurs: go straight to freeze
-    freezeAndSubmit(reason);
-    
+    // Cooldown lock to prevent tab-switch + blur firing as multiple strikes at once
+    globalCooldown = true;
+    globalStrikeCount += 1;
+
+    const currentCount = globalStrikeCount;
+    setViolationsCount(currentCount);
+
+    console.log(`[AntiCheat] Strike ${currentCount}/3 registered: ${reason}`);
+
+    if (currentCount >= 3) {
+      //  STRIKE 3: Terminate Quiz
+      setWarningModal({ open: false, reason: '' });
+      freezeAndSubmit(reason);
+    } else {
+      //  STRIKES 1 & 2: Show Warning Modal ONLY (Do NOT submit)
+      setWarningModal({ open: true, reason });
+    }
   }, [isActive, submitted, isFrozen, freezeAndSubmit]);
 
-  // 1. Block right-click
+  // Dismiss modal and re-request full-screen mode for strikes 1 & 2
+  const dismissWarning = () => {
+    setWarningModal({ open: false, reason: '' });
+
+    // Request full-screen mode again when student acknowledges warning
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    }
+
+    // Unlock listener 1.5s after clicking button
+    setTimeout(() => {
+      globalCooldown = false;
+    }, 1500);
+  };
+
+  // 1. Right Click Block
   useEffect(() => {
     if (!isActive) return;
     const b = (e) => e.preventDefault();
@@ -59,46 +93,51 @@ export default function useAntiCheat(isActive, submitted, onViolation) {
     return () => document.removeEventListener('contextmenu', b);
   }, [isActive]);
 
-  // 2. Block keyboard shortcuts
+  // 2. Keyboard Shortcuts Block (Windows & Mac)
   useEffect(() => {
     if (!isActive) return;
     const block = (e) => {
-      if (e.key === 'F12') { e.preventDefault(); return; }
-      if (e.ctrlKey || e.metaKey) {
-        if (['C','V','X','U','S','P','A','F'].includes(e.key?.toUpperCase())) { e.preventDefault(); return; }
-        if (e.shiftKey && ['I','J','C'].includes(e.key?.toUpperCase())) { e.preventDefault(); return; }
+      const key = e.key?.toUpperCase();
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+
+      if (['F12', 'F11', 'META', 'CONTEXTMENU'].includes(key)) {
+        e.preventDefault();
+        return;
       }
-      if (e.altKey && e.key === 'Tab') { e.preventDefault(); handleViolation('alt_tab'); }
+
+      if (isCmdOrCtrl && ['C', 'V', 'X', 'U', 'S', 'P', 'A', 'F', 'W', 'R', 'T', 'N'].includes(key)) {
+        e.preventDefault();
+        return;
+      }
+
+      if (isCmdOrCtrl && e.shiftKey && ['I', 'J', 'C', 'S', '4', '3', '5'].includes(key)) {
+        e.preventDefault();
+        return;
+      }
+
+      if ((e.altKey && e.key === 'Tab') || (e.metaKey && e.key === 'Tab')) {
+        e.preventDefault();
+        triggerViolation('alt_tab');
+      }
     };
+
     document.addEventListener('keydown', block);
     return () => document.removeEventListener('keydown', block);
-  }, [isActive, handleViolation]);
+  }, [isActive, triggerViolation]);
 
-  // 3. Tab switch
+  // 3. Tab Switch / Window Blur Detection
   useEffect(() => {
     if (!isActive) return;
-    const fn = () => { if (document.hidden) handleViolation('tab_switch'); };
-    document.addEventListener('visibilitychange', fn);
-    return () => document.removeEventListener('visibilitychange', fn);
-  }, [isActive, handleViolation]);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        triggerViolation('tab_switch');
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isActive, triggerViolation]);
 
-  // 4. Window blur
-  useEffect(() => {
-    if (!isActive) return;
-    const fn = () => handleViolation('window_blur');
-    window.addEventListener('blur', fn);
-    return () => window.removeEventListener('blur', fn);
-  }, [isActive, handleViolation]);
-
-  // 5. Fullscreen exit
-  useEffect(() => {
-    if (!isActive) return;
-    const fn = () => { if (!document.fullscreenElement) handleViolation('exit_fullscreen'); };
-    document.addEventListener('fullscreenchange', fn);
-    return () => document.removeEventListener('fullscreenchange', fn);
-  }, [isActive, handleViolation]);
-
-  // 6. Block copy/select
+  // 4. Block Copy/Cut/Select
   useEffect(() => {
     if (!isActive) return;
     const b = (e) => e.preventDefault();
@@ -112,21 +151,12 @@ export default function useAntiCheat(isActive, submitted, onViolation) {
     };
   }, [isActive]);
 
-  // 7. Block page close
-  useEffect(() => {
-    if (!isActive || submitted) return;
-    const fn = (e) => { e.preventDefault(); e.returnValue = ''; };
-    window.addEventListener('beforeunload', fn);
-    return () => window.removeEventListener('beforeunload', fn);
-  }, [isActive, submitted]);
-
-  // The freeze overlay — render this in your JSX
-  const FreezeOverlay = () => {
-    if (!isFrozen) return null;
+  // Overlays UI
+  const AntiCheatOverlays = () => {
     return (
       <>
         <style>{`
-          body { overflow: hidden !important; }
+          ${isFrozen ? 'body { overflow: hidden !important; }' : ''}
           @keyframes pulse {
             0%   { box-shadow: 0 0 0 0px rgba(192,57,43,0.5); }
             70%  { box-shadow: 0 0 0 18px rgba(192,57,43,0); }
@@ -134,70 +164,79 @@ export default function useAntiCheat(isActive, submitted, onViolation) {
           }
         `}</style>
 
-        {/* Full-screen dark blur overlay */}
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 99999,
-          backgroundColor: 'rgba(0,0,0,0.78)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'not-allowed',
-          userSelect: 'none',
-        }}
-          onContextMenu={(e) => e.preventDefault()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ fontSize: '60px', marginBottom: '20px' }}>🔒</div>
-
+        {/* Warning Modal (Strikes 1 & 2) */}
+        {warningModal.open && !isFrozen && (
           <div style={{
-            background: '#fff',
-            borderRadius: '16px',
-            padding: '36px 44px',
-            textAlign: 'center',
-            maxWidth: '400px',
-            width: '90%',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            position: 'fixed', inset: 0, zIndex: 99998,
+            backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <h2 style={{ color: '#c0392b', margin: '0 0 10px', fontSize: '22px' }}>
-              Screen Frozen
-            </h2>
-            <p style={{ color: '#666', fontSize: '15px', margin: '0 0 24px', lineHeight: 1.6 }}>
-              You left the quiz window too many times.<br />
-              Your quiz is being auto-submitted.
-            </p>
-
-            {/* Pulsing countdown circle */}
             <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              background: '#c0392b',
-              color: '#fff',
-              fontSize: '38px',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              animation: 'pulse 1s ease-out infinite',
+              background: '#fff', borderRadius: '12px', padding: '28px',
+              textAlign: 'center', maxWidth: '400px', width: '90%',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
             }}>
-              {countdown}
+              <div style={{ fontSize: '44px', marginBottom: '12px' }}>⚠️</div>
+              <h3 style={{ color: '#e67e22', margin: '0 0 8px', fontSize: '20px' }}>
+                Violation Warning ({violationsCount}/3)
+              </h3>
+              <p style={{ color: '#444', fontSize: '14px', margin: '0 0 18px', lineHeight: 1.5 }}>
+                A policy violation was detected: <strong>{warningModal.reason.replace('_', ' ')}</strong>.
+                <br /><br />
+                You have <strong>{3 - violationsCount}</strong> warning(s) left. Clicking below will return you to full-screen mode. Reaching 3 violations will terminate your quiz.
+              </p>
+              <button 
+                onClick={dismissWarning}
+                style={{
+                  background: '#e67e22', color: '#fff', border: 'none',
+                  padding: '12px 24px', borderRadius: '6px', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer', width: '100%'
+                }}
+              >
+                I Understand & Re-enter Fullscreen
+              </button>
             </div>
-
-            <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>
-              Submitting in {countdown} second{countdown !== 1 ? 's' : ''}...
-            </p>
           </div>
-        </div>
+        )}
+
+        {/* Freeze Modal (Strike 3) */}
+        {isFrozen && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            cursor: 'not-allowed', userSelect: 'none',
+          }}>
+            <div style={{ fontSize: '60px', marginBottom: '20px' }}>🔒</div>
+            <div style={{
+              background: '#fff', borderRadius: '16px', padding: '36px 44px',
+              textAlign: 'center', maxWidth: '400px', width: '90%',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            }}>
+              <h2 style={{ color: '#c0392b', margin: '0 0 10px', fontSize: '22px' }}>
+                Quiz Terminated
+              </h2>
+              <p style={{ color: '#666', fontSize: '15px', margin: '0 0 24px', lineHeight: 1.6 }}>
+                You reached 3 violations.<br />
+                Your quiz is being auto-submitted.
+              </p>
+              <div style={{
+                width: '80px', height: '80px', borderRadius: '50%',
+                background: '#c0392b', color: '#fff', fontSize: '38px',
+                fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 16px', animation: 'pulse 1s ease-out infinite',
+              }}>
+                {countdown}
+              </div>
+              <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>
+                Submitting in {countdown} second{countdown !== 1 ? 's' : ''}...
+              </p>
+            </div>
+          </div>
+        )}
       </>
     );
   };
 
-  
-  return { FreezeOverlay };
+  return { AntiCheatOverlays, violationsCount };
 }

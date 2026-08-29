@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/apiService';
@@ -7,6 +8,9 @@ export default function QuizPreviewPage() {
   const navigate = useNavigate();
   const [quizData, setQuizData] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Track which specific question is currently being replaced
+  const [replacingId, setReplacingId] = useState(null);
 
   useEffect(() => {
     const fetchPreview = async () => {
@@ -23,6 +27,40 @@ export default function QuizPreviewPage() {
     };
     fetchPreview();
   }, [token]);
+
+  // Handler to replace a specific question
+  const handleSwapQuestion = async (targetQuestionId, indexToReplace) => {
+    setReplacingId(targetQuestionId);
+
+    // Collect all existing question IDs in current state to prevent duplicates
+    const excludeIds = quizData.questions.map((q) => q.id);
+
+    try {
+      const res = await api.post('/prof/get-replacement-question', {
+        exclude_ids: excludeIds,
+        subject: quizData.subject || null, // Pass subject if available in quizData
+      });
+
+      if (res.data && res.data.success) {
+        const replacementQuestion = res.data.question;
+
+        // Create updated questions array with the replaced question
+        const updatedQuestions = [...quizData.questions];
+        updatedQuestions[indexToReplace] = replacementQuestion;
+
+        setQuizData({
+          ...quizData,
+          questions: updatedQuestions,
+        });
+      }
+    } catch (err) {
+      console.error("Error swapping question:", err);
+      const errMsg = err.response?.data?.message || "Failed to fetch replacement question.";
+      alert(errMsg);
+    } finally {
+      setReplacingId(null);
+    }
+  };
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center', fontSize: '1.2rem', color: '#64748b' }}>Loading Preview...</div>;
   if (!quizData || !quizData.questions) return <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Quiz not found or invalid token.</div>;
@@ -51,31 +89,57 @@ export default function QuizPreviewPage() {
       {/* 📝 QUESTION LIST */}
       <div style={styles.questionList}>
         {quizData.questions.map((q, index) => (
-          <div key={q.id} style={styles.questionCard}>
-            <h3 style={styles.questionText}>
-              <span style={styles.questionNumber}>Q{index + 1}.</span> {q.text}
-            </h3>
+          <div key={q.id || index} style={styles.questionCard}>
+            
+            {/* Question Header Row + Swap Button */}
+            <div style={styles.questionHeaderRow}>
+              <h3 style={styles.questionText}>
+                <span style={styles.questionNumber}>Q{index + 1}.</span> {q.text || q.question_txt || 'Question Text Missing'}
+              </h3>
+
+              <button
+                style={{
+                  ...styles.swapBtn,
+                  ...(replacingId === q.id ? styles.swapBtnDisabled : {})
+                }}
+                disabled={replacingId === q.id}
+                onClick={() => handleSwapQuestion(q.id, index)}
+              >
+                {replacingId === q.id ? '🔄 Swapping...' : '🔄 Swap Question'}
+              </button>
+            </div>
             
             <div style={styles.optionsGrid}>
-              {q.options.map((opt, oIndex) => (
-                <div 
-                  key={oIndex} 
-                  style={{
-                    ...styles.optionBox,
-                    // Highlight the correct option in Green
-                    ...(opt.is_correct ? styles.correctOption : {})
-                  }}
-                >
-                  <input 
-                    type="radio" 
-                    disabled // Stops clicking
-                    checked={opt.is_correct} // Auto-selects the correct answer
-                    style={{ marginRight: '12px', transform: 'scale(1.2)' }}
-                  />
-                  {opt.text}
-                  {opt.is_correct && <span style={styles.correctLabel}>✓ Correct Answer</span>}
-                </div>
-              ))}
+              {q.options && q.options.length > 0 ? (
+                q.options.map((opt, oIndex) => {
+                  const isCorrect = Boolean(opt.is_correct);
+                  const optionText = opt.text || opt.option_text || 'Option text unavailable';
+                  
+                  return (
+                    <div 
+                      key={oIndex} 
+                      style={{
+                        ...styles.optionBox,
+                        // Highlight the correct option in Green
+                        ...(isCorrect ? styles.correctOption : {})
+                      }}
+                    >
+                      <input 
+                        type="radio" 
+                        disabled // Stops clicking
+                        checked={isCorrect} // Auto-selects the correct answer
+                        style={{ marginRight: '12px', transform: 'scale(1.2)' }}
+                      />
+                      {optionText}
+                      {isCorrect && <span style={styles.correctLabel}>✓ Correct Answer</span>}
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                  No options found for this question.
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -125,8 +189,31 @@ const styles = {
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)', 
       border: '1px solid #e2e8f0' 
   },
-  questionText: { margin: '0 0 20px 0', color: '#1e293b', fontSize: '1.2rem', lineHeight: '1.5' },
+  questionHeaderRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: '15px',
+      marginBottom: '20px'
+  },
+  questionText: { margin: 0, color: '#1e293b', fontSize: '1.2rem', lineHeight: '1.5', flex: 1 },
   questionNumber: { color: '#667eea', marginRight: '8px', fontWeight: '800' },
+  swapBtn: {
+      backgroundColor: '#f1f5f9',
+      color: '#475569',
+      border: '1px solid #cbd5e1',
+      padding: '8px 14px',
+      borderRadius: '6px',
+      fontSize: '0.88rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      transition: 'all 0.2s ease'
+  },
+  swapBtnDisabled: {
+      opacity: 0.6,
+      cursor: 'not-allowed'
+  },
   optionsGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: '12px' },
   optionBox: { 
       display: 'flex', 

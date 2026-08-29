@@ -52,6 +52,7 @@ def login():
         session['logged_in'] = True
         session['id'] = user_id
         session['role'] = getattr(user, 'role', 'student')
+        session['username'] = user.username
                 
         #priyanka       
         return jsonify({

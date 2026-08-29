@@ -443,23 +443,44 @@ def get_professor_quizzes(teacher_id):
     try:
         sql = """
             SELECT 
-                id, quiz_title, teacher, school, department, program, 
-                semester, course, course_id, total_questions, 
-                quiz_status AS status, 
-                quiz_link, 
-                quiz_token AS token, 
-                created_at 
-            FROM quizzes 
-            WHERE teacher_id = %s 
-            ORDER BY created_at DESC
+                 q.id, 
+                 q.quiz_title, 
+                 ua.user_name AS teacher, 
+                 q.school, 
+                 q.department, 
+                 q.program, 
+                 q.semester, 
+                 q.course, 
+                 q.course_id, 
+                 q.total_questions, 
+                 q.time_limit, 
+                 q.quiz_status AS status, 
+                 q.quiz_link, 
+                 q.quiz_token AS token, 
+                 q.start_time,
+                 q.end_time,
+                 q.created_at,
+                 GROUP_CONCAT(d.division SEPARATOR ', ') AS published_divisions
+            FROM quizzes q
+            LEFT JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            LEFT JOIN division d ON qscd.division_id = d.id
+            LEFT JOIN user_account ua ON q.teacher_id = ua.user_id AND ua.role_id = 2
+            WHERE q.teacher_id = %s 
+            GROUP BY q.id
+            ORDER BY q.created_at DESC
         """
         cursor.execute(sql, (teacher_id,))
         results = cursor.fetchall()
         
-        # Convert datetime objects to string
         for row in results:
-            if row['created_at']:
+            if row.get('created_at'):
                 row['created_at'] = row['created_at'].isoformat()
+            if row.get('start_time'):
+                row['start_time'] = row['start_time'].isoformat()
+            if row.get('end_time'):
+                row['end_time'] = row['end_time'].isoformat()
+            if not row.get('published_divisions'):
+                row['published_divisions'] = 'Not Assigned'
                 
         return results
     except Exception as e:
@@ -625,21 +646,86 @@ def get_divisions_for_publish(teacher_id, course_id):
         cursor.close()
         conn.close()
 
-# Add this function to handle the Publish logic
-def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
-    """Updates quiz status and links it to specific divisions."""
+def check_division_schedule_conflict(division_ids, start_time, end_time, current_quiz_id=None):
+    """
+    Checks if any of the given division_ids already have an active/published quiz
+    scheduled in an overlapping time window.
+    
+    Two time slots overlap when:
+      (Existing Start < New End) AND (Existing End > New Start)
+    
+    Returns (True, conflicting_division_name) if a conflict exists, otherwise (False, None).
+    """
+    if not start_time or not end_time or not division_ids:
+        return False, None
+
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Update Quiz Metadata (Time Limit & Status)
+        format_strings = ', '.join(['%s'] * len(division_ids))
+        
+        # SQL query to detect overlapping time slots for the given divisions
+        sql = f"""
+            SELECT d.division, q.quiz_title, q.start_time, q.end_time
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            JOIN division d ON qscd.division_id = d.id
+            WHERE qscd.division_id IN ({format_strings})
+              AND q.quiz_status = 'Published'
+              AND q.start_time < %s
+              AND q.end_time > %s
+        """
+        params = list(division_ids) + [end_time, start_time]
+
+        # Exclude self when updating/re-publishing an existing quiz
+        if current_quiz_id:
+            sql += " AND q.id != %s"
+            params.append(current_quiz_id)
+
+        sql += " LIMIT 1"
+
+        cursor.execute(sql, tuple(params))
+        conflict = cursor.fetchone()
+
+        if conflict:
+            return True, conflict['division']
+            
+        return False, None
+    except Exception as e:
+        print(f"Error checking schedule conflict: {e}")
+        return False, None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title, start_time=None, end_time=None):
+    """Updates quiz status, scheduling times, and links it to specific divisions after checking for conflicts."""
+    
+    # 1. Check for schedule conflicts across selected divisions
+    has_conflict, conflicting_div = check_division_schedule_conflict(
+        division_ids=division_ids,
+        start_time=start_time,
+        end_time=end_time,
+        current_quiz_id=quiz_id
+    )
+
+    if has_conflict:
+        return False, f"Division {conflicting_div} already has a scheduled quiz during this time slot."
+
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        # 2. Update Quiz Metadata including start_time and end_time
         update_quiz_sql = """
             UPDATE quizzes 
-            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s 
+            SET time_limit = %s, quiz_status = 'Published', quiz_title = %s,
+                start_time = %s, end_time = %s
             WHERE id = %s
         """
-        cursor.execute(update_quiz_sql, (time_limit, quiz_title, quiz_id))
+        cursor.execute(update_quiz_sql, (time_limit, quiz_title, start_time, end_time, quiz_id))
 
-        # 2. Get Course and Semester info from the quiz to ensure consistency
+        # 3. Get Course and Semester info from the quiz
         get_ids_sql = """
             SELECT q.course_id, sc.semester_id 
             FROM quizzes q
@@ -647,7 +733,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
             WHERE q.id = %s LIMIT 1
         """
         cursor.execute(get_ids_sql, (quiz_id,))
-        meta = cursor.fetchone() # returns tuple (course_id, semester_id)
+        meta = cursor.fetchone()
         
         if not meta:
             raise Exception("Could not verify course/semester details.")
@@ -655,8 +741,7 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
         course_id = meta['course_id']
         semester_id = meta['semester_id']
 
-        # 3. Link Quiz to Selected Divisions
-        # Clear old links first to prevent duplicates
+        # 4. Link Quiz to Selected Divisions
         cursor.execute("DELETE FROM quiz_semester_course_division WHERE quiz_id = %s", (quiz_id,))
 
         insert_div_sql = """
@@ -669,14 +754,14 @@ def publish_quiz_to_divisions(quiz_id, time_limit, division_ids, quiz_title):
             cursor.execute(insert_div_sql, (quiz_id, semester_id, course_id, div_id))
 
         conn.commit()
-        return True
+        return True, "Quiz scheduled & published successfully!"
     except Exception as e:
         conn.rollback()
         print(f"Error publishing quiz: {type(e).__name__}: {e}")
-        return False
+        return False, "Failed to publish quiz due to internal error."
     finally:
         cursor.close()
-        conn.close() 
+        conn.close()
 
 def get_professor_results_table(quiz_id):
     conn = get_db_connection()
@@ -792,10 +877,28 @@ def get_all_student_marks_for_export(teacher_id):
         conn.close()
 
 # 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
-# STUDENT SIDE
+# STUDENT SIDE ❤️❤️❤️
 def get_quiz_for_student(token):
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+    # Check schedule time window
+    time_check_query = """
+        SELECT quiz_title, start_time, end_time 
+        FROM quizzes 
+        WHERE quiz_token = %s
+    """
+    cursor.execute(time_check_query, (token,))
+    quiz_meta = cursor.fetchone()
+
+    if not quiz_meta:
+        return {'error': 'Quiz not found.'}
+
+    now = datetime.now()
+    if quiz_meta['start_time'] and now < quiz_meta['start_time']:
+        return {'error': f"Quiz is scheduled to start at {quiz_meta['start_time']}."}
+    if quiz_meta['end_time'] and now > quiz_meta['end_time']:
+        return {'error': "This quiz schedule has expired."}
 
     query = """
         SELECT q.quiz_title, qb.id as question_id, qb.question_txt, 
@@ -809,15 +912,8 @@ def get_quiz_for_student(token):
     cursor.execute(query, (token,))
     quiz_info = cursor.fetchall()
 
-    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
-    # Check Question and Option Counts of a Token, for debugging
-    # unique_question_ids = {row['question_id'] for row in quiz_info}
-    # print(f"Total rows (options) returned: {len(quiz_info)}")
-    # print(f"Total unique questions: {len(unique_question_ids)}")
-    #🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍🎍
-
     if not quiz_info:
-        return 'Invalid token or no quiz found.'
+        return {'error': 'No questions found for this quiz.'}
 
     quiz_data = {
         "title": quiz_info[0]['quiz_title'],
@@ -861,21 +957,33 @@ def submit_student_quiz(token, student_id, answers):
         total_score = 0
         response_data = [] # List to store tuples for batch insert
 
-        for q_id, opt_id in answers.items():
-            # Check if option is correct
-            # Assumes answer_map has 'is_correct' boolean
-            cursor.execute("SELECT is_correct FROM answer_map WHERE id = %s", (opt_id,))
+        # ❤️❤️❤️
+        for q_id, answer_val in answers.items():
+            # ✅ THE FIX: Match by ID OR Option Text to support any frontend payload
+            cursor.execute("""
+                SELECT id, is_correct 
+                FROM answer_map 
+                WHERE question_id = %s AND (id = %s OR option_text = %s)
+                LIMIT 1
+            """, (q_id, answer_val, str(answer_val)))
+            
             option = cursor.fetchone()
             
             marks = 0
-            if option and option['is_correct']:
-                # Get marks for this question
-                cursor.execute("SELECT marks FROM question_bank WHERE id = %s", (q_id,))
-                q_meta = cursor.fetchone()
-                marks = q_meta['marks'] if q_meta else 1
-                total_score += marks
+            real_opt_id = None
+
+            if option:
+                real_opt_id = option['id'] # Grab the real database ID
+                
+                # Check if it is correct (handles MySQL TINYINT returns: 1, '1', or True)
+                if option['is_correct'] in [1, '1', True, b'\x01']:
+                    # Get marks for this question
+                    cursor.execute("SELECT marks FROM question_bank WHERE id = %s", (q_id,))
+                    q_meta = cursor.fetchone()
+                    marks = q_meta['marks'] if (q_meta and q_meta['marks']) else 1
+                    total_score += marks
             
-            response_data.append((q_id, opt_id, marks))
+            response_data.append((q_id, real_opt_id, marks))
 
         # 3. Insert into quiz_attempt
         cursor.execute("""
@@ -890,12 +998,12 @@ def submit_student_quiz(token, student_id, answers):
             VALUES (%s, %s, %s)
         """, (student_id, quiz_id, attempt_id))
 
-        # 5. Store Responses (JSON logic stored relationally)
-        for q_id, opt_id, marks in response_data:
+        # 5. Store Responses with the REAL option ID
+        for q_id, real_opt_id, marks in response_data:
             cursor.execute("""
                 INSERT INTO attempt_response (attempt_id, question_id, selected_option_id, marks_awarded)
                 VALUES (%s, %s, %s, %s)
-            """, (attempt_id, q_id, opt_id, marks))
+            """, (attempt_id, q_id, real_opt_id, marks))
 
         conn.commit()
         return {"score": total_score, "attempt_id": attempt_id}

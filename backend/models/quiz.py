@@ -18,6 +18,9 @@ class Quiz(db.Model):
     status = db.Column(db.String(20), default='Published')
     # Generate a unique link slug
     quiz_link = db.Column(db.String(200), default=lambda: str(uuid.uuid4()))
+    # 🆕 Added for Quiz Scheduling ❤️❤️❤️
+    start_time = db.Column(db.DateTime, nullable=True)
+    end_time = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -37,6 +40,9 @@ class Quiz(db.Model):
             'duration': self.duration,
             'status': self.status,
             'quiz_link': self.quiz_link,
+            # 🆕 Format for React frontend ❤️❤️❤️
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'end_time': self.end_time.isoformat() if self.end_time else None,
             # Use isoformat for easy consumption by JavaScript
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
