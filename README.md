@@ -935,10 +935,10 @@ This project was developed and maintained as a B.Tech Computer Science Engineeri
 
 | Contributor | Role & Core Responsibilities | GitHub Profile |
 |---|---|---|
-| **Tanishka** | **Project Lead & Repository Maintainer**<br>• System architecture & version control workflows<br>• Core full-stack integration & deployment setups<br>• Project blueprint & requirement specifications| [@tanishka](https://github.com/Tanishka07Maurya) |
+| **Tanishka* Maurya** | **Project Lead & Repository Maintainer**<br>• System architecture & version control workflows<br>• Core full-stack integration & deployment setups<br>• Project blueprint & requirement specifications| [@tanishka](https://github.com/Tanishka07Maurya) |
 | **Vaidehi Jha** | **Security & Anti-Cheat Architecture**<br>• Auth services, Argon2/JWT session management<br>• Behavioral lockdown (fullscreen, tab-switch tracking)<br>• Client API integration & custom hooks| [@VaidehiJha18](https://github.com/VaidehiJha18) |
-| **Priyanka** | **Frontend Lead & Exam Engine Specialist**<br>• React UI/UX, dashboards, dynamic quiz runner<br>• Student & professor role-based governance (RBAC)<br>• Security compliance & request validations & Multi-format paper compilation (DOCX/PDF/CSV) | [@priyanka](https://github.com/Pri170306) |
-| **Moiesha** |**Backend Research & Database Lead**<br>• MySQL relational schema, pooling & migrations<br>• Backend research, API route development & testing<br>• Randomized quiz generation & scheduling services |  [@Moiesha](https://github.com/Moiesha) |
+| **Priyanka Gate** | **Frontend Lead & Exam Engine Specialist**<br>• React UI/UX, dashboards, dynamic quiz runner<br>• Student & professor role-based governance (RBAC)<br>• Security compliance & request validations & Multi-format paper compilation (DOCX/PDF/CSV) | [@priyanka](https://github.com/Pri170306) |
+| **Moiesha Gupta** |**Backend Research & Database Lead**<br>• MySQL relational schema, pooling & migrations<br>• Backend research, API route development & testing<br>• Randomized quiz generation & scheduling services |  [@Moiesha](https://github.com/Moiesha) |
 
 ---
 ## Acknowledgments
