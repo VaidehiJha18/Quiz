@@ -451,3 +451,36 @@ export const unlinkAdminSemesterCourse = async (semesterId, courseId) => {
   }
   return await response.json();
 };
+
+//new addition
+// --- PHASE 2: EXAM PAPER GENERATION & ARCHIVE APIS ---
+
+// 1. Upload Question Paper Document (PDF, DOCX, CSV)
+export const uploadPaperDocument = (formData) => {
+  return api.post('/prof/upload-paper-file', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+// 2. Submit Custom Blueprint to Generate Exam Paper
+export const generateCustomExamPaper = (blueprintData) => {
+  return api.post('/prof/generate-custom-paper', blueprintData);
+};
+
+// 3. Fetch Past Exam Papers Archive
+export const fetchPastExamPapers = (courseId) => {
+  const url = courseId ? `/prof/past-papers?course_id=${courseId}` : '/prof/past-papers';
+  return api.get(url);
+};
+
+// 4. Fetch Paper Details for Live Preview
+export const fetchPaperFullDetails = (paperId) => {
+  return api.get(`/prof/paper-details/${paperId}`);
+};
+
+// 5. Download Official Word (.docx) Paper
+export const downloadPaperDocx = (paperId) => {
+  return api.get(`/prof/export-paper-docx/${paperId}`, {
+    responseType: 'blob'
+  });
+};

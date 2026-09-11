@@ -1,0 +1,114 @@
+.preview-wrapper {
+  padding: 30px;
+  background: #525659;
+  min-height: 100vh;
+}
+.export-bar {
+  max-width: 800px;
+  margin: 0 auto 16px auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.docx-export-btn {
+  background: #2563eb;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.print-export-btn {
+  background: #0f172a;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.exam-sheet {
+  background: white;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  font-family: 'Times New Roman', Times, serif;
+}
+.enrollment-header {
+  text-align: right;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.institution-title {
+  text-align: center;
+  margin-bottom: 14px;
+}
+.institution-title h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.institution-title h3 {
+  margin: 2px 0;
+  font-size: 15px;
+}
+.institution-title h4 {
+  margin: 2px 0;
+  font-size: 13px;
+}
+.metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+.metadata-table td {
+  border: 1px solid black;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+.instructions-section {
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.instructions-section ol {
+  margin: 4px 0 0 18px;
+  padding: 0;
+}
+.question-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+.q-header-row th {
+  text-align: left;
+  font-size: 14px;
+  padding: 4px 0;
+}
+.q-row td {
+  padding: 6px 0;
+  vertical-align: top;
+  font-size: 14px;
+}
+.sub-label {
+  font-weight: bold;
+}
+.q-marks {
+  text-align: right;
+  font-weight: bold;
+}
+.or-divider-cell {
+  text-align: center;
+  font-weight: bold;
+  padding: 8px 0;
+}
+.diagram-box img {
+  max-width: 300px;
+  display: block;
+  margin-top: 8px;
+}
+.end-divider {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 20px;
+}
