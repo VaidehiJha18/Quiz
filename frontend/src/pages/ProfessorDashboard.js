@@ -124,12 +124,22 @@ export default function ProfessorDashboard() {
         </Card>
 
         <Card className="card card-left-align">
+  <h3>Generate Exam Paper</h3>
+  <p>Create Mid-Sem and End-Sem question papers with custom marks, LaTeX, and Word/PDF export.</p>
+  <Link to="/professor/generate-paper" className="btn btn-primary" style={{ marginTop: '10px' }}>
+    Generate Paper
+  </Link>
+</Card>
+
+        <Card className="card card-left-align">
           <h3>Analytics & Reports</h3>
           <p>View class performance averages and download Excel/CSV reports.</p>
           <Link to="/professor/analytics" className="btn analytics-btn" style={{marginTop: '10px'}}>
             Open Analytics
           </Link>
         </Card>
+        
+        
       </div>
     </main>
   );
