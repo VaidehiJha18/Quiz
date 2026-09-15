@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom'; // 👈 IMPORT THIS
+import { Link, Outlet } from 'react-router-dom'; // 👈 IMPORT THIS
 import Sidebar from './Sidebar'; 
 import Header from './Header'; 
 import Footer from './Footer';
@@ -25,5 +25,8 @@ const ProfessorLayout = () => {
         </div>
     );
 };
-
+<Link to="/professor/generate-paper" className="sidebar-nav-item">
+  <div className="nav-icon">📑</div>
+  <span>Exam Paper Generator</span>
+</Link>
 export default ProfessorLayout;

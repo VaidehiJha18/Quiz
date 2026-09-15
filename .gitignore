@@ -187,3 +187,10 @@ frontend/node_modules/
 #  Backend
 backend/__pycache__/
 .env
+
+# Generator & Test scripts
+generate_readme.py
+.readmeaiignore
+test.py
+test_quiz_generation.py
+*.bak
