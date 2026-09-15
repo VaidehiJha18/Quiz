@@ -406,17 +406,17 @@ def get_quiz_results_table_endpoint(quiz_id):
 
 @professor_bp.route('/publish-results', methods=['POST'])
 @professor_required
-def publish_results_endpoint():
-    data = request.get_json() or {}
-    attempt_ids = data.get('attempt_ids', [])
-    try:
-        success = quiz_service.publish_student_results(attempt_ids)
-        if success:
-            return jsonify({"message": "Results published successfully"}), 200
-        return jsonify({"message": "Failed to publish results"}), 400
-    except Exception as e:
-        return jsonify({"message": f"Error publishing results: {str(e)}"}), 500
-
+def publish_results_api():
+    data = request.get_json()
+    attempt_ids = data.get('attempt_ids') # List of attempt IDs to publish
+    
+    if not attempt_ids:
+        return jsonify({"message": "No attempts selected"}), 400
+        
+    success = quiz_service.publish_quiz_results(attempt_ids)
+    if success:
+        return jsonify({"message": "Results published to students!"}), 200
+    return jsonify({"message": "Failed to publish"}), 500
 
 # -------------------------------------------------------------------------
 # 5. STUDENT ROSTER & DRILL-DOWN MANAGEMENT
