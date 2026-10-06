@@ -197,3 +197,6 @@ generate_readme.py
 test.py
 test_quiz_generation.py
 *.bak
+
+#  IDEs
+.idea/
