@@ -183,10 +183,13 @@ cython_debug/
 # Frontend
 node_modules/
 frontend/node_modules/
+frontend/.env
 
 #  Backend
 backend/__pycache__/
 .env
+*.env
+backend/.env
 
 # Generator & Test scripts
 generate_readme.py

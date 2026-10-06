@@ -2,7 +2,7 @@ import os
 import pymysql
 import traceback
 from functools import wraps
-from flask import Blueprint, session, request, jsonify, send_file
+from flask import Blueprint, session, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
 
 from ..extensions import get_db_connection
@@ -11,6 +11,7 @@ from ..services.quiz_service import fetch_questions_by_course
 from ..services.paper_parser_service import parse_and_save_docx, parse_and_save_pdf, parse_and_save_csv
 from ..services.paper_generator_service import generate_exam_paper, get_paper_full_details
 from ..services.paper_export_service import export_paper_to_docx
+from ..services.ai_generator_service import generate_mcqs_from_file, save_ai_questions_to_bank
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof')
 
@@ -681,3 +682,67 @@ def get_replacement_question():
       cursor.close()
     if db:
       db.close()
+
+
+# -------------------------------------------------------------------------
+# 7. Real-time AI Question Generator Using an LLM Pipeline
+# -------------------------------------------------------------------------
+@professor_bp.route('/generate-ai-questions', methods=['POST'])
+@professor_required
+def generate_ai_questions():
+    file_path = None
+    try:
+        # 1. Validate Uploaded File
+        if 'file' not in request.files:
+            return jsonify({'error': 'No document file uploaded.'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file.'}), 400
+
+        # 2. Extract and Validate Parameters
+        course_id = request.form.get('course_id')
+        if not course_id or course_id == 'undefined':
+            return jsonify({'error': 'Course ID is required.'}), 400
+
+        num_questions = int(request.form.get('num_questions', 5))
+        unit = int(request.form.get('unit', 1))
+        teacher_id = session.get('user_id') or session.get('id') or 1
+
+        # 3. Save File Temporarily with Sanitized Name
+        filename = secure_filename(file.filename)
+        temp_dir = os.path.join(current_app.root_path, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        file_path = os.path.join(temp_dir, filename)
+        file.save(file_path)
+
+        # 4. Generate MCQs using AI Service Pipeline
+        mcqs = generate_mcqs_from_file(file_path, num_questions=num_questions, unit=unit)
+
+        # 5. Save to Database if requested
+        saved_count = 0
+        save_to_db = request.form.get('save_to_db', 'true').lower() == 'true'
+        if save_to_db and mcqs:
+            saved_count = save_ai_questions_to_bank(mcqs, teacher_id=teacher_id, course_id=course_id, unit=unit)
+            print(f"✅ Successfully saved {saved_count} AI questions to database.")
+
+        # 6. Return Structured Response for React Modal Preview
+        return jsonify({
+            'status': 'success',
+            'questions_generated': len(mcqs),
+            'questions_saved': saved_count,
+            'questions': mcqs
+        }), 200
+
+    except Exception as e:
+        print("❌ CRITICAL ERROR IN /prof/generate-ai-questions:")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        # Guaranteed Cleanup of Temporary Upload File
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as cleanup_err:
+                print(f"⚠️ Warning: Failed to delete temp file {file_path}: {cleanup_err}")
