@@ -200,3 +200,5 @@ test_quiz_generation.py
 
 #  IDEs
 .idea/
+
+.vscode/
