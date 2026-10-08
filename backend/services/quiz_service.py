@@ -308,15 +308,15 @@ def delete_question(question_id):
     sql_delete_question_employee = "DELETE FROM question_employee WHERE question_id = %s"
     sql_delete_question_course = "DELETE FROM question_course WHERE question_id = %s"
     sql_delete_question_bank = "DELETE FROM question_bank WHERE id = %s"
-    sql_delete_quiz_questions_generated = "DELETE FROM question_course WHERE question_id = %s"
+    sql_delete_quiz_questions_generated = "DELETE FROM quiz_questions_generated WHERE question_id = %s"
 
     try:
         cursor.execute(sql_delete_answer_map, (question_id,))
         cursor.execute(sql_delete_question_employee, (question_id,))
         cursor.execute(sql_delete_question_course, (question_id,))
-        cursor.execute(sql_delete_question_bank, (question_id,))
         cursor.execute(sql_delete_quiz_questions_generated, (question_id,))
-
+        cursor.execute(sql_delete_question_bank, (question_id,))
+        
         print(f"Deleted question ID: {question_id} and its related data.")
         conn.commit()
         return True 
@@ -352,7 +352,7 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=N
             LIMIT 1
         """
         
-        cursor.execute(sql_context, (course_id))
+        cursor.execute(sql_context, (course_id,))
         meta = cursor.fetchone()
 
         # ✅ NEW LOGIC: Filter by units if the professor selected them ❤️❤️❤️❤️❤️
@@ -378,24 +378,16 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=N
             """
             cursor.execute(query_q, (teacher_id, course_id))
 
+        selected_questions = cursor.fetchall()
+        if not selected_questions: 
+            return None
+        
         school_name = meta['school_name'] if meta else "N/A"
         dept_name = meta['dept_name'] if meta else "N/A"
         prog_name = meta['program_name'] if meta else "N/A"
         sem_name = f"Semester {meta['semester_id']}" if meta else "N/A"
         course_name = meta['course_name'] if meta else "N/A"
         print(f"DEBUG: Generating quiz for Course: {course_name}")
-
-        query_q = """
-            SELECT qb.id FROM question_bank qb
-            JOIN question_employee qe ON qb.id = qe.question_id
-            JOIN question_course qc ON qb.id = qc.question_id
-            WHERE qe.employee_id = %s AND qc.course_id = %s
-            ORDER BY RAND() LIMIT 10
-        """
-        cursor.execute(query_q, (teacher_id, course_id))
-        selected_questions = cursor.fetchall()
-
-        if not selected_questions: return None
 
         count = len(selected_questions)
 

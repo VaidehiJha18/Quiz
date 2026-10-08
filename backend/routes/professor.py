@@ -164,7 +164,7 @@ def get_course_divisions():
         return jsonify([]), 200
 
     try:
-        divisions = quiz_service.get_divisions_for_course(teacher_id, int(course_id))
+        divisions = quiz_service.get_divisions_for_publish(teacher_id, int(course_id))
         return jsonify(divisions), 200
     except Exception as e:
         print(f"Error fetching divisions: {e}")
