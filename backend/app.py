@@ -22,6 +22,8 @@ def create_app(config_class=Config):
   )
 
   app.config.from_object(config_class)
+  if app.config.get("GOOGLE_API_KEY"):
+      os.environ["GOOGLE_API_KEY"] = app.config["GOOGLE_API_KEY"]
 
   # Debug log config details
   print('=' * 50)
@@ -32,9 +34,11 @@ def create_app(config_class=Config):
   print(f"DB_PORT: {app.config.get('DB_PORT')}")
   print('=' * 50)
 
+  is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER') == 'true'
+
   app.config.update(
-      SESSION_COOKIE_SECURE=True,  # True for Render / HTTPS
-      SESSION_COOKIE_SAMESITE='None',  # 'None' for cross-origin cookies
+      SESSION_COOKIE_SECURE=is_production,  # False on localhost, True on Render
+      SESSION_COOKIE_SAMESITE='None' if is_production else 'Lax',
       SESSION_COOKIE_HTTPONLY=True,
       SESSION_PERMANENT=False,
       SESSION_COOKIE_NAME='quiz_portal_session_new',

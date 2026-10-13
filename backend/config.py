@@ -35,3 +35,5 @@ class Config:
     DEBUG = True
     SESSION_COOKIE_SECURE = True  
     
+# --- Google Gemini AI API Key ---
+    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')

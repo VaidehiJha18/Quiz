@@ -183,10 +183,13 @@ cython_debug/
 # Frontend
 node_modules/
 frontend/node_modules/
+frontend/.env
 
 #  Backend
 backend/__pycache__/
 .env
+*.env
+backend/.env
 
 # Generator & Test scripts
 generate_readme.py
@@ -194,7 +197,16 @@ generate_readme.py
 test.py
 test_quiz_generation.py
 *.bak
+<<<<<<< HEAD
 **/.DS_Store
 **/.DS_Store
 **/.DS_Store
+**/.DS_Store
+=======
+
+#  IDEs
+.idea/
+
+.vscode/
+>>>>>>> 03c66d02bebd369ee90f1d3b63fb78e7e4fe8f5f
 **/.DS_Store
