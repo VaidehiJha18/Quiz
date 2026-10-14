@@ -20,6 +20,9 @@ def create_app(config_class=Config):
       static_folder=FRONTEND_BUILD_DIR,
       template_folder=FRONTEND_BUILD_DIR,
   )
+  upload_dir = os.path.join(app.root_path, 'uploads')
+  os.makedirs(upload_dir, exist_ok=True)
+  app.config['UPLOAD_FOLDER'] = upload_dir
 
   app.config.from_object(config_class)
   if app.config.get("GOOGLE_API_KEY"):

@@ -254,46 +254,52 @@ def update_question(question_id, data):
 
 # 6. Fetch Questions by Course ID
 def fetch_questions_by_course(course_id):
-    """Fetches full question details for a specific course ID.
-    Returns list of objects: { question_id, question_txt, options: [{option_text,is_correct}, ...] }
-    """
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # JOIN linking question text to their options and correct status
         sql = """
             SELECT 
                 qb.id AS question_id,
                 qb.question_txt,
-                qb.unit,  # ❤️❤️❤️
+                qb.unit,
+                qb.marks,
+                qb.question_type,
+                qb.bloom_level,
+                am.id AS option_id,
                 am.option_text,
                 am.is_correct
             FROM question_bank qb
-            JOIN answer_map am ON qb.id = am.question_id
+            LEFT JOIN answer_map am ON qb.id = am.question_id
             JOIN question_course qc ON qb.id = qc.question_id
             WHERE qc.course_id = %s
+            ORDER BY qb.id DESC
         """
         cursor.execute(sql, (course_id,))
         results = cursor.fetchall()
 
-        # Restructure results into nested format for React
         questions = {}
         for row in results:
             q_id = row['question_id']
             if q_id not in questions:
                 questions[q_id] = {
+                    'id': q_id,
                     'question_id': q_id,
                     'question_txt': row['question_txt'],
-                    'unit': row['unit'], # ✅ Map the unit❤️❤️❤️
+                    'unit': str(row['unit']),
+                    'marks': row['marks'] or 1,
+                    'question_type': row['question_type'] or 'Descriptive',
+                    'bloom_level': row['bloom_level'] or 'Understand',
                     'options': []
                 }
-            questions[q_id]['options'].append({
-                'option_text': row['option_text'],
-                'is_correct': row['is_correct']
-            })
+            if row['option_text']:
+                questions[q_id]['options'].append({
+                    'option_id': row['option_id'],
+                    'option_text': row['option_text'],
+                    'is_correct': bool(row['is_correct'])
+                })
         return list(questions.values())
     except Exception as e:
-        print(f"Database crash during question fetch: {e}")
+        print(f"Error fetching bank questions: {e}")
         return []
     finally:
         cursor.close()
@@ -330,7 +336,7 @@ def delete_question(question_id):
         conn.close()
 
 # 8. Generate and Save Quiz ❤️❤️❤️❤️❤️
-def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=None): # ✅ Added parameter
+def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=None, num_questions=10): # ✅ Added parameter
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -355,33 +361,61 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=N
         cursor.execute(sql_context, (course_id,))
         meta = cursor.fetchone()
 
-        # ✅ NEW LOGIC: Filter by units if the professor selected them ❤️❤️❤️❤️❤️
+        # 2. Build Base Query enforcing MCQ question type and answer_map options existence
+        base_query = """
+            SELECT DISTINCT qb.id 
+            FROM question_bank qb
+            JOIN question_employee qe ON qb.id = qe.question_id
+            JOIN question_course qc ON qb.id = qc.question_id
+            JOIN answer_map am ON qb.id = am.question_id
+            WHERE qe.employee_id = %s 
+              AND qc.course_id = %s 
+              AND qb.question_type = 'MCQ'
+        """
+        params = [teacher_id, course_id]
+
+        # Filter by units if the professor selected them ❤️❤️❤️❤️❤️
         if selected_units and len(selected_units) > 0:
             placeholders = ', '.join(['%s'] * len(selected_units))
-            query_q = f"""
-                SELECT qb.id FROM question_bank qb
-                JOIN question_employee qe ON qb.id = qe.question_id
-                JOIN question_course qc ON qb.id = qc.question_id
-                WHERE qe.employee_id = %s AND qc.course_id = %s AND qb.unit IN ({placeholders})
-                ORDER BY RAND() LIMIT 10
-            """
-            params = [teacher_id, course_id] + selected_units
-            cursor.execute(query_q, tuple(params))
-        else:
-            # Fallback: Just grab random questions from the course if no units selected
-            query_q = """
-                SELECT qb.id FROM question_bank qb
-                JOIN question_employee qe ON qb.id = qe.question_id
-                JOIN question_course qc ON qb.id = qc.question_id
-                WHERE qe.employee_id = %s AND qc.course_id = %s
-                ORDER BY RAND() LIMIT 10
-            """
-            cursor.execute(query_q, (teacher_id, course_id))
+            base_query += f" AND qb.unit IN ({placeholders})"
+            params.extend(selected_units)
 
+        # Apply Randomization and Dynamic Question Count Limit
+        base_query += " ORDER BY RAND() LIMIT %s"
+        params.append(int(num_questions))
+
+        # Execute Teacher-Specific Query
+        cursor.execute(base_query, tuple(params))
         selected_questions = cursor.fetchall()
+
+        # Fallback: If no teacher-specific questions, query the course-wide pool
+        if not selected_questions:
+            fallback_query = """
+                SELECT DISTINCT qb.id 
+                FROM question_bank qb
+                JOIN question_course qc ON qb.id = qc.question_id
+                JOIN answer_map am ON qb.id = am.question_id
+                WHERE qc.course_id = %s 
+                  AND qb.question_type = 'MCQ'
+            """
+            fallback_params = [course_id]
+
+            if selected_units and len(selected_units) > 0:
+                placeholders = ', '.join(['%s'] * len(selected_units))
+                fallback_query += f" AND qb.unit IN ({placeholders})"
+                fallback_params.extend(selected_units)
+
+            fallback_query += " ORDER BY RAND() LIMIT %s"
+            fallback_params.append(int(num_questions))
+
+            cursor.execute(fallback_query, tuple(fallback_params))
+            selected_questions = cursor.fetchall()
+
+        # If no questions exist at all for this course/units, abort quiz generation
         if not selected_questions: 
             return None
         
+        # Assign Metadata Variables
         school_name = meta['school_name'] if meta else "N/A"
         dept_name = meta['dept_name'] if meta else "N/A"
         prog_name = meta['program_name'] if meta else "N/A"
@@ -391,6 +425,7 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=N
 
         count = len(selected_questions)
 
+        # Generate Quiz Token and Access Link
         quiz_token = str(uuid.uuid4())[:12]
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
         quiz_link = f"{frontend_url}/take-quiz/{quiz_token}"
@@ -420,11 +455,17 @@ def generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units=N
         quiz_id = cursor.lastrowid
 
         for q in selected_questions:
-            # 🚀 LOWERCASE TABLE NAME HERE TO MATCH DB
-            cursor.execute("INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)", (quiz_id, q['id']))
+            cursor.execute(
+                "INSERT INTO quiz_questions_generated (quiz_id, question_id) VALUES (%s, %s)", 
+                 (quiz_id, q['id'])
+            )
 
         conn.commit()
-        return {"id": quiz_id, "quiz_link": quiz_link, "token": quiz_token, "question_count": count}
+        return {
+            "id": quiz_id, 
+            "quiz_link": quiz_link, 
+            "token": quiz_token, 
+            "question_count": count}
     finally:
         conn.close()
 

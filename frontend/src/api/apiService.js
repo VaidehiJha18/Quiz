@@ -413,3 +413,16 @@ export const generateAIQuestions = async (formData) => {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
 };
+
+// 6. Generate AI Questions for a Specific Paper
+export const generatePaperAIQuestions = (formData) => {
+  return api.post('/prof/generate-paper-ai-questions', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+export const uploadCourseSyllabus = (formData) => {
+  return api.post('/prof/upload-syllabus', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
