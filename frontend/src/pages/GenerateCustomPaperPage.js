@@ -69,6 +69,7 @@ export default function GenerateCustomPaperPage() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   // Mid-Sem Blueprint Generator (20 Marks)
   const getMidSemBlueprint = () => [
@@ -178,28 +179,29 @@ export default function GenerateCustomPaperPage() {
       setQuestions(getEndSemBlueprint(val));
     }
   };
+
   // Syllabus Upload Handler
   const handleUploadSyllabus = async () => {
-  if (!syllabusFile || !selectedCourse) {
-    alert("Please select a Course and upload a syllabus file.");
-    return;
-  }
-  setUploadingSyllabus(true);
-  const formData = new FormData();
-  formData.append('file', syllabusFile);
-  formData.append('course_id', selectedCourse);
+    if (!syllabusFile || !selectedCourse) {
+      alert("Please select a Course and upload a syllabus file.");
+      return;
+    }
+    setUploadingSyllabus(true);
+    const formData = new FormData();
+    formData.append('file', syllabusFile);
+    formData.append('course_id', selectedCourse);
 
-  try {
-    const res = await uploadCourseSyllabus(formData);
-    alert(res.data.message || "Syllabus successfully parsed & saved into DB!");
-    setShowSyllabusModal(false);
-    setSyllabusFile(null);
-  } catch (err) {
-    alert(err.response?.data?.error || "Syllabus upload failed.");
-  } finally {
-    setUploadingSyllabus(false);
-  }
-};
+    try {
+      const res = await uploadCourseSyllabus(formData);
+      alert(res.data.message || "Syllabus successfully parsed & saved into DB!");
+      setShowSyllabusModal(false);
+      setSyllabusFile(null);
+    } catch (err) {
+      alert(err.response?.data?.error || "Syllabus upload failed.");
+    } finally {
+      setUploadingSyllabus(false);
+    }
+  };
 
   // 1. Handlers for Banner Ingestion
   const handleFileChange = (e) => {
@@ -227,7 +229,7 @@ export default function GenerateCustomPaperPage() {
 
       if (questionsList.length > 0) {
         setExtractedAIQuestions(questionsList);
-        setShowReviewModal(true); // 💡 Open Review Modal
+        setShowReviewModal(true);
       }
     } catch (err) {
       alert(err.response?.data?.error || "AI Ingestion failed.");
@@ -255,7 +257,7 @@ export default function GenerateCustomPaperPage() {
       });
 
       setQuestions(updatedQuestions);
-      alert(`✨ Approved! Questions synced and auto-filled into your exam paper layout.`);
+      alert(`Approved! Questions synced and auto-filled into your exam paper layout.`);
     }
     setShowReviewModal(false);
     setSelectedFiles([]);
@@ -380,7 +382,6 @@ export default function GenerateCustomPaperPage() {
       return;
     }
     setPickerTarget({ qIdx, pIdx, isOr });
-    const part = isOr ? questions[qIdx].or_sub_parts[pIdx] : questions[qIdx].sub_parts[pIdx];
     setFilterMarks('ALL');
     setFilterUnit('ALL');
 
@@ -404,92 +405,62 @@ export default function GenerateCustomPaperPage() {
     target.mode = 'bank';
     target.selected_qid = q.id || q.question_id;
     target.selected_preview = q.question_txt || q.text;
-    target.manual_text = q.question_txt || q.text; // Backup text
+    target.manual_text = q.question_txt || q.text;
     
     setQuestions(updated);
     setModalOpen(false);
   };
 
-  const currentConfiguredMarks = questions.reduce((sum, q) => sum + Number(q.total_section_marks || 0), 0);
+  // Total marks computation helper
+  const calculateTotalMarks = () => {
+    return questions.reduce((sum, q) => sum + Number(q.total_section_marks || 0), 0);
+  };
 
-  const handleRunMultiFileAI = async () => {
-  if (selectedFiles.length === 0 || !selectedCourse) {
-    alert("Please select a Course and upload at least one file.");
-    return;
-  }
-  setIngesting(true);
-  const formData = new FormData();
-  selectedFiles.forEach((file) => formData.append('files', file));
-  formData.append('course_id', selectedCourse);
-
-  try {
-    const res = await generatePaperAIQuestions(formData);
-    const aiQuestions = res.data.questions || [];
-
-    if (aiQuestions.length > 0 && questions.length > 0) {
-      // Clone current blueprint layout
-      const updatedQuestions = [...questions];
-      let aiIndex = 0;
-
-      // Assign AI questions directly to the blueprint slots
-      updatedQuestions.forEach((qBlock) => {
-        qBlock.sub_parts.forEach((part) => {
-          if (aiIndex < aiQuestions.length) {
-            part.mode = 'manual';
-            part.manual_text = aiQuestions[aiIndex].question_txt;
-            aiIndex++;
-          }
-        });
-      });
-
-      setQuestions(updatedQuestions);
-      alert(`✨ Success! Ingested ${res.data.saved_count} questions and auto-filled them into your exam paper layout!`);
-    } else {
-      alert(`✨ Success! Ingested ${res.data.saved_count} questions into the Course Bank!`);
-    }
-    setSelectedFiles([]);
-  } catch (err) {
-    alert(err.response?.data?.error || "AI Ingestion failed.");
-  } finally {
-    setIngesting(false);
-  }
-};
+  const currentConfiguredMarks = calculateTotalMarks();
 
   const handleGenerate = async () => {
+    setErrorMsg('');
+    setShowErrorModal(false);
+
     if (!selectedCourse) {
-      setErrorMsg('Please select a Course first.');
-      return;
-    }
-    if (!examType) {
-      setErrorMsg('Please select an Exam Type Blueprint.');
-      return;
-    }
-    if (!questions || questions.length === 0) {
-      setErrorMsg('Please configure at least one question block.');
+      setErrorMsg('Please select a course before generating the question paper.');
+      setShowErrorModal(true);
       return;
     }
 
-    setErrorMsg('');
+    if (!examType) {
+      setErrorMsg('Please select an exam blueprint type.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!questions || questions.length === 0) {
+      setErrorMsg('Please configure at least one question block.');
+      setShowErrorModal(true);
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
       course_id: Number(selectedCourse),
-      paper_title: paperTitle || (examType === 'mid_sem' ? 'Mid Semester Examination' : 'End Semester Examination'),
+      paper_title: paperTitle,
       exam_type: examType,
-      academic_year: academicYear || '2025-2026',
-      total_marks: Number(currentConfiguredMarks || (examType === 'mid_sem' ? 20 : 40)),
+      academic_year: academicYear,
+      total_marks: calculateTotalMarks(),
       questions: questions
     };
 
     try {
       const res = await generateCustomExamPaper(payload);
-      if (res.data && res.data.paper_id) {
-        navigate(`/professor/paper-preview/${res.data.paper_id}`);
-      }
+      navigate(`/professor/paper-preview/${res.data.paper_id}`);
     } catch (err) {
-      const backendError = err.response?.data?.error || 'Generation failed. Please try again.';
+      const backendError =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Cannot generate paper: Please verify that sufficient questions are available in the Question Bank.';
       setErrorMsg(backendError);
-      console.error("Generation error:", err.response?.data);
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -516,7 +487,7 @@ export default function GenerateCustomPaperPage() {
               onClick={() => setShowSyllabusModal(true)}
               style={{ marginTop: '10px', width: '100%', fontWeight: 'bold' }}
             >
-              📘 Upload Course Syllabus
+              Upload Course Syllabus
             </button>
             {/* 1. Unit Selector Dropdown */}
             <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)}>
@@ -559,7 +530,7 @@ export default function GenerateCustomPaperPage() {
           <div className="doc-ingest-card">
             <div className="doc-card-header">
               <div className="doc-card-title">
-                📑 Document Ingestion
+                Document Ingestion
               </div>
               <div className="doc-card-sub">
                 Upload .docx, .pdf, or .csv files
@@ -575,11 +546,9 @@ export default function GenerateCustomPaperPage() {
         </div>
       </div>
 
-      {errorMsg && <div className="error-alert">{errorMsg}</div>}
-
       {/* 1. Examination Details */}
       <div className="glass-card meta-card">
-        <h3 className="section-title"> Examination Details</h3>
+        <h3 className="section-title">Examination Details</h3>
         <div className="meta-grid">
           <div className="form-group">
             <label>Course:</label>
@@ -637,7 +606,7 @@ export default function GenerateCustomPaperPage() {
       {/* 2. Question Blocks Configuration */}
       <div className="glass-card">
         <div className="blueprint-header-bar">
-          <h3 className="section-title"> Question Blocks & Sub-Question Architecture</h3>
+          <h3 className="section-title">Question Blocks & Sub-Question Architecture</h3>
           <span className="marks-badge">Configured Marks: {currentConfiguredMarks} Marks</span>
         </div>
 
@@ -703,14 +672,14 @@ export default function GenerateCustomPaperPage() {
                               setQuestions(updated);
                             }}
                           >
-                            🎲 Auto
+                            Auto
                           </button>
                           <button
                             type="button"
                             className={`mode-btn ${part.mode === 'bank' ? 'active' : ''}`}
                             onClick={() => openBankPicker(qIdx, pIdx, false)}
                           >
-                            📚 Bank
+                            Bank
                           </button>
                           <button
                             type="button"
@@ -721,7 +690,7 @@ export default function GenerateCustomPaperPage() {
                               setQuestions(updated);
                             }}
                           >
-                            ✍️ Type
+                            Type
                           </button>
                         </div>
                       </div>
@@ -788,6 +757,7 @@ export default function GenerateCustomPaperPage() {
                               <option value="Descriptive">Descriptive</option>
                               <option value="MCQ">MCQ</option>
                             </select>
+
                             <span className="marks-pill">{part.marks} Marks</span>
 
                             <div className="mode-switch-group">
@@ -800,14 +770,14 @@ export default function GenerateCustomPaperPage() {
                                   setQuestions(updated);
                                 }}
                               >
-                                🎲 Auto
+                                Auto
                               </button>
                               <button
                                 type="button"
                                 className={`mode-btn ${part.mode === 'bank' ? 'active' : ''}`}
                                 onClick={() => openBankPicker(qIdx, pIdx, true)}
                               >
-                                📚 Bank
+                                Bank
                               </button>
                               <button
                                 type="button"
@@ -818,7 +788,7 @@ export default function GenerateCustomPaperPage() {
                                   setQuestions(updated);
                                 }}
                               >
-                                ✍️ Type
+                                Type
                               </button>
                             </div>
                           </div>
@@ -882,10 +852,10 @@ export default function GenerateCustomPaperPage() {
 
         <div className="action-footer-bar">
           <button className="btn-secondary" onClick={() => navigate('/professor/dashboard')}>
-            ← Back to Dashboard
+            Back to Dashboard
           </button>
           <button className="btn-generate-main" onClick={handleGenerate} disabled={loading || questions.length === 0}>
-            {loading ? 'Compiling Paper...' : '⚡ Generate Final Question Paper'}
+            {loading ? 'Compiling Paper...' : 'Generate Final Question Paper'}
           </button>
         </div>
       </div>
@@ -918,60 +888,55 @@ export default function GenerateCustomPaperPage() {
             </div>
 
             <div className="modal-question-list">
-  {bankQuestions.length === 0 ? (
-    <p style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-      No questions found in the database for this course. Try running AI Ingest!
-    </p>
-  ) : (
-    bankQuestions
-      // Type-safe string comparison for unit and marks filters
-      .filter((q) => (filterUnit === 'ALL' || String(q.unit || 1) === String(filterUnit)))
-      .filter((q) => (filterMarks === 'ALL' || String(q.marks || 1) === String(filterMarks)))
-      .map((q) => (
-        <div key={q.id || q.question_id} className="question-card">
-  {/* Question Meta Badges */}
-  <div className="q-card-header">
-    <span className="badge unit">Unit {q.unit || 1}</span>
-    <span className="badge marks">{q.marks || 1} Marks</span>
-    <span 
-      className="badge type" 
-      style={{ 
-        backgroundColor: q.question_type === 'MCQ' ? '#e0e7ff' : '#fef3c7',
-        color: q.question_type === 'MCQ' ? '#3730a3' : '#92400e',
-        fontWeight: 'bold' 
-      }}
-    >
-      {q.question_type || (q.marks === 1 ? 'MCQ' : 'Descriptive')}
-    </span>
-  </div>
+              {bankQuestions.length === 0 ? (
+                <p style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                  No questions found in the database for this course. Try running AI Ingest!
+                </p>
+              ) : (
+                bankQuestions
+                  .filter((q) => (filterUnit === 'ALL' || String(q.unit || 1) === String(filterUnit)))
+                  .filter((q) => (filterMarks === 'ALL' || String(q.marks || 1) === String(filterMarks)))
+                  .map((q) => (
+                    <div key={q.id || q.question_id} className="question-card">
+                      <div className="q-card-header">
+                        <span className="badge unit">Unit {q.unit || 1}</span>
+                        <span className="badge marks">{q.marks || 1} Marks</span>
+                        <span 
+                          className="badge type" 
+                          style={{ 
+                            backgroundColor: q.question_type === 'MCQ' ? '#e0e7ff' : '#fef3c7',
+                            color: q.question_type === 'MCQ' ? '#3730a3' : '#92400e',
+                            fontWeight: 'bold' 
+                          }}
+                        >
+                          {q.question_type || (q.marks === 1 ? 'MCQ' : 'Descriptive')}
+                        </span>
+                      </div>
 
-  {/* Question Text */}
-  <p className="q-text">{q.question_txt || q.text}</p>
+                      <p className="q-text">{q.question_txt || q.text}</p>
 
-  {/* 💡 FIX: ONLY render options if question_type is 'MCQ' AND options list is NOT empty */}
-  {q.question_type === 'MCQ' && q.options && q.options.length > 0 && (
-    <div className="mcq-options-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
-      {q.options.map((opt, idx) => (
-        <div key={idx} className={`option-box ${opt.is_correct ? 'correct' : ''}`}>
-          {String.fromCharCode(65 + idx)}. {opt.option_text || opt.text || opt} {opt.is_correct ? '✓' : ''}
-        </div>
-      ))}
-    </div>
-  )}
+                      {q.question_type === 'MCQ' && q.options && q.options.length > 0 && (
+                        <div className="mcq-options-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
+                          {q.options.map((opt, idx) => (
+                            <div key={idx} className={`option-box ${opt.is_correct ? 'correct' : ''}`}>
+                              {String.fromCharCode(65 + idx)}. {opt.option_text || opt.text || opt} {opt.is_correct ? '✓' : ''}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-  {/* Select Button for Blueprint Slot */}
-  <button 
-    type="button"
-    className="btn-select-q" 
-    onClick={() => selectBankQuestion(q)}
-    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', marginTop: '12px' }}
-  >
-    Select This Question ✓
-  </button>
-</div>
-      ))
-  )}
-</div>
+                      <button 
+                        type="button"
+                        className="btn-select-q" 
+                        onClick={() => selectBankQuestion(q)}
+                        style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', marginTop: '12px' }}
+                      >
+                        Select This Question ✓
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -988,7 +953,7 @@ export default function GenerateCustomPaperPage() {
             borderRadius: '12px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, color: '#1e293b' }}>✨ AI Question Generator (PDF / PPT)</h3>
+              <h3 style={{ margin: 0, color: '#1e293b' }}>AI Question Generator (PDF / PPT)</h3>
               <button 
                 type="button"
                 onClick={() => setShowAIModal(false)}
@@ -1082,7 +1047,7 @@ export default function GenerateCustomPaperPage() {
 
                           {q.rationale && (
                             <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', borderRadius: '4px', fontSize: '12px', color: '#92400e' }}>
-                              💡 <strong>Rationale:</strong> {q.rationale}
+                              <strong>Rationale:</strong> {q.rationale}
                             </div>
                           )}
                         </div>
@@ -1112,80 +1077,105 @@ export default function GenerateCustomPaperPage() {
           </div>
         </div>
       )}
+
+      {/* Extracted AI Questions Review Modal */}
       {showReviewModal && (
-      <div className="bank-modal-overlay">
-        <div className="bank-modal-content">
-          <div className="modal-top">
-            <h3>Review Extracted Questions & Detected Units</h3>
-            <button className="modal-close" onClick={() => setShowReviewModal(false)}>✕</button>
-          </div>
+        <div className="bank-modal-overlay">
+          <div className="bank-modal-content">
+            <div className="modal-top">
+              <h3>Review Extracted Questions & Detected Units</h3>
+              <button className="modal-close" onClick={() => setShowReviewModal(false)}>✕</button>
+            </div>
 
-          <div className="modal-question-list">
-            <table className="review-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '6%' }}>#</th>
-                  <th style={{ width: '64%' }}>Question & Options</th>
-                  <th style={{ width: '15%' }}>Detected Unit</th>
-                  <th style={{ width: '15%' }}>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {extractedAIQuestions.map((q, idx) => (
-                  <tr key={idx}>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                    <td className="q-text-cell">
-                      <p className="q-title">{q.question_txt}</p>
-                      
-                      {/* Render 4 Options grid when question is MCQ */}
-                      {q.question_type === 'MCQ' && q.options && q.options.length > 0 && (
-                        <div className="mcq-options-grid">
-                          {q.options.map((opt, optIdx) => (
-                            <div 
-                              key={optIdx} 
-                              className={`option-pill ${optIdx === q.correct_index ? 'correct' : ''}`}
-                            >
-                              {String.fromCharCode(65 + optIdx)}. {opt} {optIdx === q.correct_index && '✓'}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Render rationale callout if present */}
-                      {q.rationale && (
-                        <div className="rationale-box">
-                          💡 <strong>Rationale:</strong> {q.rationale}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span className="badge unit-badge">Unit {q.unit || '1'}</span>
-                    </td>
-                    <td>
-                      <span className={`badge type-badge ${q.question_type === 'MCQ' ? 'mcq' : 'descriptive'}`}>
-                        {q.question_type || 'Descriptive'}
-                      </span>
-                    </td>
+            <div className="modal-question-list">
+              <table className="review-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '6%' }}>#</th>
+                    <th style={{ width: '64%' }}>Question & Options</th>
+                    <th style={{ width: '15%' }}>Detected Unit</th>
+                    <th style={{ width: '15%' }}>Type</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {extractedAIQuestions.map((q, idx) => (
+                    <tr key={idx}>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
+                      <td className="q-text-cell">
+                        <p className="q-title">{q.question_txt}</p>
+                        
+                        {q.question_type === 'MCQ' && q.options && q.options.length > 0 && (
+                          <div className="mcq-options-grid">
+                            {q.options.map((opt, optIdx) => (
+                              <div 
+                                key={optIdx} 
+                                className={`option-pill ${optIdx === q.correct_index ? 'correct' : ''}`}
+                              >
+                                {String.fromCharCode(65 + optIdx)}. {opt} {optIdx === q.correct_index && '✓'}
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
-          <div className="modal-actions-bar">
-            <button className="btn-secondary" onClick={() => setShowReviewModal(false)}>Cancel</button>
-            <button className="btn-ai-ingest" onClick={handleApproveAndSyncBlueprint}>
-              Approve & Sync to Blueprint
-            </button>
+                        {q.rationale && (
+                          <div className="rationale-box">
+                            <strong>Rationale:</strong> {q.rationale}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="badge unit-badge">Unit {q.unit || '1'}</span>
+                      </td>
+                      <td>
+                        <span className={`badge type-badge ${q.question_type === 'MCQ' ? 'mcq' : 'descriptive'}`}>
+                          {q.question_type || 'Descriptive'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="modal-actions-bar">
+              <button className="btn-secondary" onClick={() => setShowReviewModal(false)}>Cancel</button>
+              <button className="btn-ai-ingest" onClick={handleApproveAndSyncBlueprint}>
+                Approve & Sync to Blueprint
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
-    {showSyllabusModal && (
+      )}
+
+      {/* Centered Professional Alert Modal */}
+      {showErrorModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-dialog">
+            <div className="custom-modal-header">
+              <h4>System Notification</h4>
+            </div>
+            <div className="custom-modal-body">
+              <p>{errorMsg}</p>
+            </div>
+            <div className="custom-modal-footer">
+              <button
+                type="button"
+                className="btn-modal-dismiss"
+                onClick={() => setShowErrorModal(false)}
+              >
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Syllabus Modal */}
+      {showSyllabusModal && (
         <div className="bank-modal-overlay">
           <div className="bank-modal-content" style={{ width: '520px' }}>
             <div className="modal-top">
-              <h3>📘 Upload Syllabus Reference</h3>
+              <h3>Upload Syllabus Reference</h3>
               <button className="modal-close" onClick={() => setShowSyllabusModal(false)}>✕</button>
             </div>
             <div style={{ padding: '20px' }}>
