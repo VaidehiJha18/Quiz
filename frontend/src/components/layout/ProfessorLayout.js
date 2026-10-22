@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, Outlet } from 'react-router-dom'; // 👈 IMPORT THIS
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar'; 
 import Header from './Header'; 
 import Footer from './Footer';
@@ -16,7 +16,7 @@ const ProfessorLayout = () => {
 
                 {/* 3. DYNAMIC CONTENT HERE */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', backgroundColor: '#f4f6f8' }}>
-                    <Outlet />  {/* 👈 THIS IS REQUIRED TO RENDER CHILD PAGES */}
+                    <Outlet />  {/* 👈 Renders child pages like GenerateCustomPaperPage */}
                 </div>
 
                 {/* 4. Footer at the bottom */}
@@ -25,8 +25,5 @@ const ProfessorLayout = () => {
         </div>
     );
 };
-<Link to="/professor/generate-paper" className="sidebar-nav-item">
-  <div className="nav-icon">📑</div>
-  <span>Exam Paper Generator</span>
-</Link>
+
 export default ProfessorLayout;

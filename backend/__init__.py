@@ -2,6 +2,8 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from .config import Config
+from dotenv import load_dotenv
+load_dotenv()
 
 def create_app(config_class=Config):
     app = Flask(__name__)

@@ -11,6 +11,13 @@ from google.genai import types
 from google.genai import errors
 from backend.extensions import get_db_connection
 
+# Comprehensive list of valid Google Gemini models with automatic fallback
+# Updated valid models list for google-genai
+CANDIDATE_GEMINI_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-3.5-flash',
+]
 # 1. Document Text Extraction Helpers
 def extract_text_from_pdf(file_path):
     text = ""
@@ -35,7 +42,6 @@ def extract_text_from_docx(file_path):
     doc = docx.Document(file_path)
     return "\n".join([p.text for p in doc.paragraphs if p.text])
 
-#❤️❤️❤️
 def extract_text_from_files(file_paths, max_chars=12000):
     combined_text = ""
     for path in file_paths:
@@ -50,12 +56,12 @@ def extract_text_from_files(file_paths, max_chars=12000):
         elif ext in ['.doc', '.docx']:
             raw_text = extract_text_from_docx(path)
             
-        # 2. 💡 Filter out common scanner artifacts and unwanted watermarks
+        # 2. Filter out common scanner artifacts and unwanted watermarks
         lines = raw_text.split("\n")
         filtered_lines = [
             line for line in lines 
             if "camscanner" not in line.lower() 
-            and "scanned by" not in line.lower()
+            and "scanned by" not in line.lower() 
             and "scanned with" not in line.lower()
         ]
         
@@ -64,17 +70,23 @@ def extract_text_from_files(file_paths, max_chars=12000):
     return combined_text[:max_chars]
 
 def get_google_api_key():
-    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    if api_key:
-        return api_key
-    try:
-        if current_app:
-            return current_app.config.get("GOOGLE_API_KEY") or current_app.config.get("GEMINI_API_KEY")
-    except Exception:
-        pass
+    """
+    Safely retrieves and cleans the Google/Gemini API key, stripping
+    any surrounding quotes, spaces, or newlines.
+    """
+    raw_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not raw_key:
+        try:
+            if current_app:
+                raw_key = current_app.config.get("GEMINI_API_KEY") or current_app.config.get("GOOGLE_API_KEY")
+        except Exception:
+            pass
+
+    if raw_key:
+        return str(raw_key).strip().strip('"').strip("'")
     return None
 
-# 2. Main Question Generation Engine
+# 2. Main Question Generation Engine (MCQ Specific)
 def generate_mcqs_from_file(file_path, num_questions=5, unit=1):
     ext = os.path.splitext(file_path)[1].lower()
     if ext == '.pdf':
@@ -87,12 +99,11 @@ def generate_mcqs_from_file(file_path, num_questions=5, unit=1):
     if len(text_content.strip()) < 50:
         raise ValueError("Could not extract sufficient text from the document.")
 
-    # Safely limit text length
     text_content = text_content[:10000]
 
     api_key = get_google_api_key()
     if not api_key:
-        raise ValueError("Google API Key is not configured. Please set GOOGLE_API_KEY in environment or config.py.")
+        raise ValueError("Google API Key is not configured. Please set GOOGLE_API_KEY in environment or .env file.")
 
     client = genai.Client(api_key=api_key)
 
@@ -109,17 +120,11 @@ Each object in the array must contain:
 - "rationale": Short explanation of why the answer is correct.
 """
 
-    # ✅ Only use valid Gemini 3+ models
-    candidate_models = [
-        'gemini-3.8-flash',
-        'gemini-3.8-flash'  
-    ]
-
     last_exception = None
 
-    for idx, model_name in enumerate(candidate_models):
+    for idx, model_name in enumerate(CANDIDATE_GEMINI_MODELS):
         try:
-            print(f"DEBUG: Attempting AI MCQ generation using model '{model_name}' (Attempt {idx + 1})...")
+            print(f"DEBUG: Attempting AI MCQ generation using model '{model_name}' (Attempt {idx + 1}/{len(CANDIDATE_GEMINI_MODELS)})...")
             
             response = client.models.generate_content(
                 model=model_name,
@@ -136,21 +141,19 @@ Each object in the array must contain:
             else:
                 raw_text = str(raw_content).strip()
 
-            # Clean markdown formatting backticks if present
             if raw_text.startswith("```json"):
                 raw_text = raw_text[7:]
             if raw_text.startswith("```"):
                 raw_text = raw_text[3:]
             if raw_text.endswith("```"):
                 raw_text = raw_text[:-3]
-            raw_text = raw_text.strip()
 
-            return json.loads(raw_text)
+            return json.loads(raw_text.strip())
 
         except (errors.ClientError, errors.ServerError, Exception) as e:
-            print(f"⚠️ Model '{model_name}' failed with error: {e}. Waiting 2 seconds before retrying...")
+            print(f"⚠️ Model '{model_name}' failed with: {e}. Trying fallback model...")
             last_exception = e
-            time.sleep(2)  # Give Google API load spikes time to settle
+            time.sleep(1.5)
 
     raise last_exception
 
@@ -212,11 +215,8 @@ def save_ai_questions_to_bank(questions, teacher_id, course_id, unit=1):
         cursor.close()
         conn.close()
 
-# 4. Dynamically fetches the latest syllabus topics for a given course ID from MySQL.
+# 4. Dynamically fetches the latest syllabus topics for a given course ID from MySQL
 def get_course_syllabus_context(course_id):
-    """
-    Dynamically fetches the latest syllabus topics for a given course ID from MySQL.
-    """
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -242,18 +242,17 @@ def get_course_syllabus_context(course_id):
         cursor.close()
         conn.close()
 
-# 5. For Phase 2 Mid-Sem & End-Sem Exam Papers (Generate Exam Paper Page)
+# 5. For Mid-Sem & End-Sem Exam Papers (Generate Exam Paper Page)
 def generate_paper_questions_from_docs(file_paths, course_id, unit="AUTO", num_questions=8, question_type="MIXED"):
     combined_text = extract_text_from_files(file_paths)
     if len(combined_text.strip()) < 50:
         raise ValueError("Could not extract sufficient text from uploaded document(s).")
 
-    # 💡 DYNAMIC SYLLABUS INJECTION: Fetches the latest database syllabus automatically
     dynamic_syllabus = get_course_syllabus_context(course_id)
 
     api_key = get_google_api_key()
     if not api_key:
-        raise ValueError("Google API Key is not configured.")
+        raise ValueError("Google API Key is not configured. Please set GOOGLE_API_KEY in environment or .env file.")
 
     client = genai.Client(api_key=api_key)
 
@@ -301,13 +300,12 @@ Return STRICTLY a raw JSON array without markdown code blocks. Each object MUST 
 - "course_outcome": String ("CO1", "CO2", "CO3", etc.)
 """
 
-    model_name = 'gemini-3.8-flash'
-    max_retries = 3
     last_exception = None
 
-    for attempt in range(1, max_retries + 1):
+    # Iterates across official Gemini models with auto-fallback
+    for attempt, model_name in enumerate(CANDIDATE_GEMINI_MODELS, start=1):
         try:
-            print(f"DEBUG: Attempting AI Paper Question generation using model '{model_name}' (Attempt {attempt}/{max_retries})...")
+            print(f"DEBUG: Attempting AI Paper Question generation using model '{model_name}' (Attempt {attempt}/{len(CANDIDATE_GEMINI_MODELS)})...")
             
             response = client.models.generate_content(
                 model=model_name,
@@ -333,9 +331,9 @@ Return STRICTLY a raw JSON array without markdown code blocks. Each object MUST 
 
             return json.loads(raw_text.strip())
 
-        except (errors.ServerError, Exception) as e:
+        except (errors.ServerError, errors.ClientError, Exception) as e:
             last_exception = e
-            print(f"⚠️ Google API 503 Spike on Attempt {attempt}/{max_retries}. Retrying in {attempt * 2}s...")
-            time.sleep(attempt * 2)  # Wait 2s, then 4s, then 6s
+            print(f"⚠️ Model '{model_name}' encountered: {e}. Falling back to next model...")
+            time.sleep(1.5)
 
     raise last_exception
