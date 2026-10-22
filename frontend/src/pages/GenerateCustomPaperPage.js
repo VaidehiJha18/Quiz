@@ -30,17 +30,15 @@ export default function GenerateCustomPaperPage() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [ingesting, setIngesting] = useState(false);
 
-  // AI Modal states
-  const [showAIModal, setShowAIModal] = useState(false);
-  const [aiFile, setAiFile] = useState(null);
-  const [aiNumQuestions, setAiNumQuestions] = useState(5);
-  const [numQuestions, setNumQuestions] = useState(5);
-  const [aiUnit, setAiUnit] = useState(1);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState([]);
-  const [selectedAIQuestions, setSelectedAIQuestions] = useState({});
-  const [questionType, setQuestionType] = useState('MIXED'); 
+  // Ingestion Hub Modal states
+  const [showIngestionModal, setShowIngestionModal] = useState(false);
+  const [ingestTab, setIngestTab] = useState('ai'); // 'ai' or 'document'
   
+  // ✅ Quantity starts blank so no '05' or pre-filled value shows up
+  const [numQuestions, setNumQuestions] = useState('');
+  const [questionType, setQuestionType] = useState('MIXED'); 
+  const [selectedUnit, setSelectedUnit] = useState('AUTO');
+
   // Syllabus Upload State
   const [showSyllabusModal, setShowSyllabusModal] = useState(false);
   const [syllabusFile, setSyllabusFile] = useState(null);
@@ -53,7 +51,6 @@ export default function GenerateCustomPaperPage() {
   const [filterUnit, setFilterUnit] = useState('ALL');
   const [filterMarks, setFilterMarks] = useState('ALL');
 
-  const [selectedUnit, setSelectedUnit] = useState('AUTO');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [extractedAIQuestions, setExtractedAIQuestions] = useState([]);
 
@@ -203,7 +200,7 @@ export default function GenerateCustomPaperPage() {
     }
   };
 
-  // 1. Handlers for Banner Ingestion
+  // Handlers for File Selection
   const handleFileChange = (e) => {
     if (e.target.files) {
       setSelectedFiles(Array.from(e.target.files));
@@ -217,18 +214,21 @@ export default function GenerateCustomPaperPage() {
     }
     setIngesting(true);
 
+    const countToSend = numQuestions ? Number(numQuestions) : 5;
+
     const formData = new FormData();
     selectedFiles.forEach((file) => formData.append('files', file));
     formData.append('course_id', selectedCourse);
     formData.append('unit', selectedUnit); 
     formData.append('question_type', questionType);
-    formData.append('num_questions', numQuestions);
+    formData.append('num_questions', countToSend);
     try {
       const res = await generatePaperAIQuestions(formData);
       const questionsList = res.data.questions || [];
 
       if (questionsList.length > 0) {
         setExtractedAIQuestions(questionsList);
+        setShowIngestionModal(false);
         setShowReviewModal(true);
       }
     } catch (err) {
@@ -284,74 +284,12 @@ export default function GenerateCustomPaperPage() {
       const res = await uploadPaperDocument(formData);
       alert(`Success! Saved ${res.data.questions_saved} questions into the course bank.`);
       setDocFile(null);
+      setShowIngestionModal(false);
     } catch (err) {
       alert(err.response?.data?.error || "Document upload failed.");
     } finally {
       setUploading(false);
     }
-  };
-
-  // 2. Handlers for AI Generator Modal
-  const handleAIModalFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setAiFile(e.target.files[0]);
-    }
-  };
-
-  const handleRunAIGenerator = async () => {
-    if (!aiFile) {
-      alert("Please upload a PDF or PPTX file first.");
-      return;
-    }
-    if (!selectedCourse) {
-      alert("Please select a course first.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', aiFile);
-    formData.append('course_id', selectedCourse);
-    formData.append('num_questions', aiNumQuestions);
-    formData.append('unit', aiUnit);
-    formData.append('save_to_db', 'true');
-
-    setIsGenerating(true);
-    try {
-      const res = await generateAIQuestions(formData);
-      if (res.status === 200 && res.data.questions) {
-        setGeneratedQuestions(res.data.questions);
-        const initialSelections = {};
-        res.data.questions.forEach((_, idx) => {
-          initialSelections[idx] = true;
-        });
-        setSelectedAIQuestions(initialSelections);
-      }
-    } catch (err) {
-      console.error("AI Generation failed:", err);
-      alert("Failed to generate AI questions: " + (err.response?.data?.error || err.message));
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleToggleSelectQuestion = (idx) => {
-    setSelectedAIQuestions((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
-
-  const handleImportSelectedQuestions = () => {
-    const questionsToImport = generatedQuestions.filter((_, idx) => selectedAIQuestions[idx]);
-    if (questionsToImport.length === 0) {
-      alert("Please select at least one question to import.");
-      return;
-    }
-
-    alert(`Successfully imported ${questionsToImport.length} questions into your question bank!`);
-    setShowAIModal(false);
-    setGeneratedQuestions([]);
-    setAiFile(null);
   };
 
   // Blueprint Controls
@@ -468,81 +406,27 @@ export default function GenerateCustomPaperPage() {
 
   return (
     <div className="paper-gen-page">
-      {/* Top Banner */}
-      <div className="top-banner">
-        <div className="banner-title-block">
+      {/* 🌟 Professional Top Action Bar */}
+      <div className="clean-paper-header">
+        <div className="header-info">
           <h2>Examination Blueprint & Paper Generator</h2>
-          <p>
-            Design institutional exam papers with manual entry, question bank selection, or auto-randomization
-          </p>
+          <p>Configure institutional schemas, allocate questions, or type custom items with LaTeX formulas.</p>
         </div>
-
-        {/* Right Ingestion Cards Container */}
-        <div className="ingestion-cards-container">
-          {/* Translucent AI Card */}
-          <div className="ai-ingest-card">
-            <h4>Multi-File AI Question Generator</h4>
-            <button 
-              className="btn-secondary" 
-              onClick={() => setShowSyllabusModal(true)}
-              style={{ marginTop: '10px', width: '100%', fontWeight: 'bold' }}
-            >
-              Upload Course Syllabus
-            </button>
-            {/* 1. Unit Selector Dropdown */}
-            <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)}>
-              <option value="AUTO">AI Auto-Detect Units Across Syllabus</option>
-              {[1, 2, 3, 4, 5].map((u) => (
-                <option key={u} value={u}>Unit {u}</option>
-              ))}
-            </select>
-
-            {/* 2. Question Type Selector */}
-            <select value={questionType} onChange={(e) => setQuestionType(e.target.value)}>
-              <option value="MIXED">Mixed (MCQs & Descriptive)</option>
-              <option value="MCQ">MCQs Only</option>
-              <option value="Descriptive">Descriptive Only</option>
-            </select>
-
-            {/* 3. Document File Selection */}
-            <input type="file" multiple onChange={handleFileChange} />
-
-            {/* 4. PROFESSOR QUESTION COUNT SELECTION */}
-            <div className="count-selector-group">
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Number of Questions:</label>
-              <input 
-                type="number" 
-                min="1" 
-                max="30" 
-                value={numQuestions} 
-                onChange={(e) => setNumQuestions(Math.max(1, parseInt(e.target.value) || 1))}
-                style={{ width: '70px', padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-
-            {/* 5. Action Button */}
-            <button className="btn-ai-ingest" onClick={handleAIIngest} disabled={ingesting}>
-              {ingesting ? "Processing Documents..." : "AI Ingest"}
-            </button>
-          </div>
-
-          {/* Translucent Document Card */}
-          <div className="doc-ingest-card">
-            <div className="doc-card-header">
-              <div className="doc-card-title">
-                Document Ingestion
-              </div>
-              <div className="doc-card-sub">
-                Upload .docx, .pdf, or .csv files
-              </div>
-            </div>
-            <div className="doc-card-bottom">
-              <input type="file" onChange={handleDocUpload} />
-              <button className="btn-sync-green" onClick={handleSync} disabled={uploading}>
-                {uploading ? "Syncing..." : "Upload & Sync"}
-              </button>
-            </div>
-          </div>
+        <div className="header-actions">
+          <button 
+            type="button" 
+            className="btn-header-outline"
+            onClick={() => setShowSyllabusModal(true)}
+          >
+            📘 Syllabus Reference
+          </button>
+          <button 
+            type="button" 
+            className="btn-header-primary"
+            onClick={() => setShowIngestionModal(true)}
+          >
+            ➕ Ingest / Import Questions
+          </button>
         </div>
       </div>
 
@@ -860,6 +744,118 @@ export default function GenerateCustomPaperPage() {
         </div>
       </div>
 
+      {/* 🌟 Unified Question Ingestion Hub Modal */}
+      {showIngestionModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-dialog unified-ingest-dialog">
+            <div className="custom-modal-header modal-header-flex">
+              <h4>Question Ingestion Hub</h4>
+              <button className="modal-close-x" onClick={() => setShowIngestionModal(false)}>✕</button>
+            </div>
+
+            <div className="ingest-modal-tabs">
+              <button 
+                type="button" 
+                className={`ingest-tab-btn ${ingestTab === 'ai' ? 'active' : ''}`}
+                onClick={() => setIngestTab('ai')}
+              >
+                Multi-File AI Generator
+              </button>
+              <button 
+                type="button" 
+                className={`ingest-tab-btn ${ingestTab === 'document' ? 'active' : ''}`}
+                onClick={() => setIngestTab('document')}
+              >
+                Document Sync (.docx, .csv)
+              </button>
+            </div>
+
+            <div className="custom-modal-body">
+              {ingestTab === 'ai' ? (
+                /* Tab 1: AI Multi-File Generator */
+                <div className="modal-tab-content">
+                  <p className="tab-hint">Upload lecture presentations or notes to extract curriculum-aligned questions automatically.</p>
+                  
+                  <div className="modal-grid-inputs">
+                    <div>
+                      <label>Target Unit</label>
+                      <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)}>
+                        <option value="AUTO">AI Auto-Detect Across Syllabus</option>
+                        {[1, 2, 3, 4, 5].map((u) => (
+                          <option key={u} value={u}>Unit {u}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label>Question Type</label>
+                      <select value={questionType} onChange={(e) => setQuestionType(e.target.value)}>
+                        <option value="MIXED">Mixed (MCQ & Descriptive)</option>
+                        <option value="MCQ">MCQ Only</option>
+                        <option value="Descriptive">Descriptive Only</option>
+                      </select>
+                    </div>
+
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label>Question Quantity</label>
+                      {/* ✅ Controlled input with blank default and placeholder */}
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="30" 
+                        placeholder="e.g. 5"
+                        value={numQuestions} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNumQuestions(val === '' ? '' : Math.max(1, Math.min(30, Number(val))));
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="doc-drop-zone">
+                    <input type="file" id="modal-ai-files" multiple onChange={handleFileChange} />
+                    <label htmlFor="modal-ai-files" className="doc-drop-label">
+                      <span className="drop-icon">📁</span>
+                      <span>{selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : "Select PDF / PPTX slide decks"}</span>
+                    </label>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="btn-primary-block"
+                    onClick={handleAIIngest} 
+                    disabled={ingesting || selectedFiles.length === 0}
+                  >
+                    {ingesting ? "Analyzing & Generating..." : "Generate AI Questions"}
+                  </button>
+                </div>
+              ) : (
+                /* Tab 2: Document Ingestion */
+                <div className="modal-tab-content">
+                  <p className="tab-hint">Upload a formatted question paper or spreadsheet to bulk sync into the course bank.</p>
+                  <div className="doc-drop-zone">
+                    <input type="file" id="modal-doc-upload" accept=".docx,.pdf,.csv" onChange={handleDocUpload} />
+                    <label htmlFor="modal-doc-upload" className="doc-drop-label">
+                      <span className="drop-icon">📄</span>
+                      <span>{docFile ? docFile.name : "Select .docx, .pdf, or .csv file"}</span>
+                    </label>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-primary-block"
+                    onClick={handleSync} 
+                    disabled={uploading || !docFile}
+                  >
+                    {uploading ? "Syncing Questions..." : "Upload & Sync to Course Bank"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Database Question Picker Modal */}
       {modalOpen && (
         <div className="bank-modal-overlay">
@@ -890,7 +886,7 @@ export default function GenerateCustomPaperPage() {
             <div className="modal-question-list">
               {bankQuestions.length === 0 ? (
                 <p style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                  No questions found in the database for this course. Try running AI Ingest!
+                  No questions found in the database for this course. Try importing questions!
                 </p>
               ) : (
                 bankQuestions
@@ -937,143 +933,6 @@ export default function GenerateCustomPaperPage() {
                   ))
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Generator Modal */}
-      {showAIModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center',
-          alignItems: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: '#fff', width: '800px', maxHeight: '90vh', overflowY: 'auto',
-            borderRadius: '12px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, color: '#1e293b' }}>AI Question Generator (PDF / PPT)</h3>
-              <button 
-                type="button"
-                onClick={() => setShowAIModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Upload Document (PDF / PPTX):</label>
-                <input type="file" accept=".pdf,.ppt,.pptx" onChange={handleAIModalFileChange} />
-              </div>
-              
-              <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Target Unit:</label>
-                <select value={aiUnit} onChange={(e) => setAiUnit(Number(e.target.value))} style={{ width: '100%', padding: '8px', borderRadius: '4px' }}>
-                  <option value={1}>Unit 1</option>
-                  <option value={2}>Unit 2</option>
-                  <option value={3}>Unit 3</option>
-                  <option value={4}>Unit 4</option>
-                  <option value={5}>Unit 5</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px' }}>Number of MCQs:</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="20" 
-                  value={aiNumQuestions} 
-                  onChange={(e) => setAiNumQuestions(Number(e.target.value))} 
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button 
-                  type="button"
-                  onClick={handleRunAIGenerator}
-                  disabled={isGenerating}
-                  style={{
-                    width: '100%', padding: '10px', backgroundColor: '#2563eb', color: '#fff',
-                    border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: isGenerating ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isGenerating ? "Analyzing Document & Generating..." : "Generate MCQs"}
-                </button>
-              </div>
-            </div>
-
-            {generatedQuestions.length > 0 && (
-              <div>
-                <h4 style={{ marginBottom: '12px' }}>Preview Generated Questions & Rationales:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
-                  {generatedQuestions.map((q, idx) => (
-                    <div 
-                      key={idx} 
-                      style={{
-                        border: selectedAIQuestions[idx] ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                        borderRadius: '8px', padding: '16px', backgroundColor: selectedAIQuestions[idx] ? '#eff6ff' : '#fff'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={!!selectedAIQuestions[idx]} 
-                          onChange={() => handleToggleSelectQuestion(idx)} 
-                          style={{ marginTop: '4px' }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{idx + 1}. {q.question_txt}</p>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                            {q.options && q.options.map((opt, optIdx) => (
-                              <div 
-                                key={optIdx} 
-                                style={{
-                                  padding: '6px 10px', borderRadius: '4px', fontSize: '13px',
-                                  backgroundColor: optIdx === q.correct_index ? '#dcfce7' : '#f1f5f9',
-                                  color: optIdx === q.correct_index ? '#166534' : '#334155',
-                                  fontWeight: optIdx === q.correct_index ? 'bold' : 'normal'
-                                }}
-                              >
-                                {String.fromCharCode(65 + optIdx)}. {opt} {optIdx === q.correct_index && "✓"}
-                              </div>
-                            ))}
-                          </div>
-
-                          {q.rationale && (
-                            <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', borderRadius: '4px', fontSize: '12px', color: '#92400e' }}>
-                              <strong>Rationale:</strong> {q.rationale}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-                  <button 
-                    type="button"
-                    onClick={() => setShowAIModal(false)}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleImportSelectedQuestions}
-                    style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    Import Selected to Question Pool
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
