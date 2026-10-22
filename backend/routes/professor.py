@@ -1,6 +1,7 @@
 import os
 import pymysql
 import traceback
+from datetime import datetime
 from functools import wraps
 from flask import Blueprint, session, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
@@ -21,21 +22,14 @@ professor_bp = Blueprint('professor', __name__, url_prefix='/prof')
 def professor_required(f):
     @wraps(f)
     def wrap(*args, **kwargs):
-        # ✅ Allow CORS preflight requests
+        # Allow CORS preflight requests
         if request.method == "OPTIONS":
             return '', 200
 
-        # 🔍 Extract session credentials with fallbacks
         current_role = session.get('role')
-        user_id = session.get('id')
-        print(f"DEBUG: Access Check -> User ID: {user_id} | Session Role: '{current_role}'")
-
-        # ✅ Allow multiple valid formats for "Professor"
-        # 2 = Database ID, 'professor' = Lowercase, 'Professor' = Title case
         valid_roles = ['professor', 'Professor', 2, '2']
 
         if current_role not in valid_roles:
-            print(f"❌ DENIED: Role '{current_role}' is not in valid list {valid_roles}")
             return jsonify({"message": "Unauthorized"}), 403
 
         return f(*args, **kwargs)
@@ -135,7 +129,7 @@ def fetch_courses_list_view():
         data = cursor.fetchall()
         return jsonify(data), 200
     except Exception as e:
-        print(f"!!! SQL Error fetching assigned courses: {e}")
+        print(f"SQL Error fetching assigned courses: {e}")
         return jsonify({"message": "Database query failed"}), 500
     finally:
         cursor.close()
@@ -182,13 +176,11 @@ def get_questions_api():
         if not employee_id:
             return jsonify({"message": "User ID not found in session."}), 400
 
-        # allow optional course filter via query param ?course_id=###
         course_id_raw = request.args.get('course_id')
         course_id = int(course_id_raw) if course_id_raw else None
 
         questions = quiz_service.fetch_questions(employee_id, fetch_scope='creator', course_id=course_id)
         if questions is None:
-            print("WARNING: quiz_service.fetch_questions returned None. Returning empty object {}")
             questions = {}
              
         return jsonify(questions), 200
@@ -238,12 +230,11 @@ def get_questions_by_course_api(course_id):
         print(f"Error fetching questions by course: {e}")
         return jsonify({"message": "Internal server error fetching questions."}), 500
 
+
 @professor_bp.route('/add_questions', methods=['POST'])
 @professor_required
 def add_question_api():
-    print("Received request to add question.")
     data = request.get_json() 
-    print(f"Request data: {data}")    
     required_keys = ['text', 'options', 'correct_index', 'course_id']
     if not all(key in data for key in required_keys):
         return jsonify({"message": "Missing required fields"}), 400
@@ -256,27 +247,23 @@ def add_question_api():
         quiz_service.insert_question(data, teacher_id)
         return jsonify({"message": "Question added successfully!"}), 201    
     except ValueError as ve:
-        print(f"Validation Error: {ve}")
         return jsonify({"message": str(ve)}), 400
     except Exception as e:
-        print(f"Error during question insertion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
 
-@professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE','OPTIONS'])
+
+@professor_bp.route('/delete_question/<int:question_id>', methods=['DELETE', 'OPTIONS'])
 @professor_required
 def delete_question_api(question_id):
-    print(f"Received request to delete question ID: {question_id}.")
     try:
         teacher_id = session.get('id')
         if not teacher_id:
             return jsonify({"message": "User ID not found in session. Please log in again."}), 400
-        
         quiz_service.delete_question(question_id)
         return jsonify({"message": "Question deleted successfully!"}), 200
-        
     except Exception as e:
-        print(f"Error during question deletion: {str(e)}")
         return jsonify({"message": "Internal server error during database operation."}), 500
+
 
 # -------------------------------------------------------------------------
 # 3. QUIZ GENERATION, PUBLISHING & PREVIEWS
@@ -288,7 +275,7 @@ def generate_quiz_api():
         teacher_id = session.get('user_id') or session.get('id')
         teacher_name = session.get('username') or session.get('name') or "Professor"
         if not teacher_id:
-                    return jsonify({"message": "User ID not found in session"}), 400
+            return jsonify({"message": "User ID not found in session"}), 400
         
         data = request.get_json() or {}
         course_id = data.get('course_id')
@@ -334,7 +321,6 @@ def get_quiz_preview_endpoint(token):
             return jsonify({"message": "Quiz not found"}), 404
         return jsonify(details), 200
     except Exception as e:
-        print(f"Error getting quiz preview: {e}")
         return jsonify({"message": "Internal server error"}), 500
 
 
@@ -380,7 +366,7 @@ def delete_quiz_endpoint(quiz_id):
 
 
 # -------------------------------------------------------------------------
-# 4. RESULTS & ANALYTICS
+# 4. RESULTS, ANALYTICS & PROCTOR AUDIT LOGS
 # -------------------------------------------------------------------------
 @professor_bp.route('/analytics', methods=['GET'])
 @professor_required
@@ -390,34 +376,146 @@ def get_professor_analytics():
         data = quiz_service.get_dashboard_analytics(teacher_id)
         return jsonify(data), 200
     except Exception as e:
-        print(f"Error fetching analytics: {e}")
         return jsonify({}), 500
 
 
 @professor_bp.route('/quiz-results/<int:quiz_id>', methods=['GET'])
 @professor_required
 def get_quiz_results_table_endpoint(quiz_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        results = quiz_service.get_professor_results_table(quiz_id)
-        return jsonify(results), 200
+        sql = """
+            SELECT 
+                qa.attempt_id,
+                sqa.student_id,
+                CAST(sqa.student_id AS CHAR) AS enrollment_no,
+                ua.user_name AS name,
+                COALESCE(qa.total_score, 0) AS final_score,
+                qa.submit_time AS submitted_at,
+                qa.is_published,
+                COALESCE(TIMESTAMPDIFF(SECOND, qa.start_time, qa.submit_time), 0) AS duration_seconds,
+                COUNT(v.id) AS violation_count,
+                GROUP_CONCAT(DISTINCT v.violation_type SEPARATOR ', ') AS violations_triggered
+            FROM quiz_attempt qa
+            JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
+            JOIN user_account ua ON sqa.student_id = ua.user_id
+            LEFT JOIN violations v ON sqa.quiz_id = v.quiz_id AND sqa.student_id = v.student_id
+            WHERE sqa.quiz_id = %s
+            GROUP BY qa.attempt_id, sqa.student_id, ua.user_name, qa.total_score, qa.submit_time, qa.is_published, qa.start_time
+            ORDER BY qa.submit_time DESC
+        """
+        cursor.execute(sql, (quiz_id,))
+        rows = cursor.fetchall() or []
+
+        for r in rows:
+            if not r.get('violations_triggered'):
+                r['violations_triggered'] = 'None'
+            if isinstance(r.get('submitted_at'), datetime):
+                r['submitted_at'] = r['submitted_at'].strftime("%m/%d/%Y, %I:%M:%S %p")
+
+        return jsonify(rows), 200
     except Exception as e:
-        print(f"Error fetching quiz results: {e}")
+        print(f"Error fetching quiz results table: {e}")
         return jsonify([]), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @professor_bp.route('/publish-results', methods=['POST'])
 @professor_required
 def publish_results_api():
     data = request.get_json()
-    attempt_ids = data.get('attempt_ids') # List of attempt IDs to publish
-    
+    attempt_ids = data.get('attempt_ids')
     if not attempt_ids:
         return jsonify({"message": "No attempts selected"}), 400
-        
     success = quiz_service.publish_quiz_results(attempt_ids)
     if success:
         return jsonify({"message": "Results published to students!"}), 200
     return jsonify({"message": "Failed to publish"}), 500
+
+
+@professor_bp.route('/api/professor/attempts', methods=['GET'])
+@professor_required
+def get_all_attempts():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                qa.attempt_id AS id,
+                sqa.student_id AS studentId,
+                sqa.quiz_id AS quizId,
+                ua.user_name AS studentName,
+                CAST(sqa.student_id AS CHAR) AS enrollmentNo,
+                qa.total_score AS finalScore,
+                qa.submit_time AS submittedAt,
+                CASE 
+                    WHEN qa.submit_time IS NOT NULL THEN 'SUBMITTED' 
+                    ELSE 'IN_PROGRESS' 
+                END AS status,
+                COALESCE(TIMESTAMPDIFF(SECOND, qa.start_time, qa.submit_time), 0) AS durationSeconds,
+                COUNT(v.id) AS violationCount,
+                GROUP_CONCAT(DISTINCT v.violation_type SEPARATOR ', ') AS violationsTriggered
+            FROM quiz_attempt qa
+            JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
+            JOIN user_account ua ON sqa.student_id = ua.user_id
+            LEFT JOIN violations v ON sqa.quiz_id = v.quiz_id AND sqa.student_id = v.student_id
+            GROUP BY qa.attempt_id, sqa.student_id, sqa.quiz_id, ua.user_name, qa.total_score, qa.submit_time, qa.start_time
+            ORDER BY qa.start_time DESC
+        """
+        cursor.execute(sql)
+        results = cursor.fetchall() or []
+        for r in results:
+            if not r.get('violationsTriggered'):
+                r['violationsTriggered'] = 'None'
+            if isinstance(r.get('submittedAt'), datetime):
+                r['submittedAt'] = r['submittedAt'].strftime("%m/%d/%Y, %I:%M:%S %p")
+        return jsonify(results), 200
+    except Exception as e:
+        print(f"Error fetching attempts: {e}")
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@professor_bp.route('/api/quiz/attempt/<int:attempt_id>', methods=['GET'])
+@professor_required
+def get_attempt_details(attempt_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        cursor.execute("SELECT student_id, quiz_id FROM student_quiz_attempt WHERE attempt_id = %s", (attempt_id,))
+        sqa = cursor.fetchone()
+        if not sqa:
+            return jsonify({"violations": []}), 200
+
+        cursor.execute(
+            """
+            SELECT id, violation_type AS type, snapshot, timestamp 
+            FROM violations 
+            WHERE quiz_id = %s AND student_id = %s
+            ORDER BY timestamp ASC
+            """,
+            (sqa['quiz_id'], sqa['student_id'])
+        )
+        violations = cursor.fetchall() or []
+        for v in violations:
+            if isinstance(v.get('timestamp'), datetime):
+                v['timestamp'] = v['timestamp'].isoformat()
+
+        return jsonify({
+            'attemptId': attempt_id,
+            'violations': violations
+        }), 200
+    except Exception as e:
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
 
 # -------------------------------------------------------------------------
 # 5. STUDENT ROSTER & DRILL-DOWN MANAGEMENT
@@ -518,9 +616,6 @@ def generate_custom_paper_endpoint():
     data = request.get_json()
     teacher_id = session.get('user_id') or session.get('id')
 
-    print(f"DEBUG: Generate Paper Request by Teacher ID: {teacher_id}")
-    print(f"DEBUG: Received Blueprint Data: {data}")
-
     if not data or not data.get('questions'):
         return jsonify({"error": "Invalid paper blueprint submitted"}), 400
 
@@ -528,7 +623,6 @@ def generate_custom_paper_endpoint():
         result = generate_exam_paper(teacher_id, data)
         return jsonify(result), 200
     except Exception as e:
-        print(f"ERROR during paper generation: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 
@@ -584,115 +678,90 @@ def export_paper_docx_endpoint(paper_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # -------------------------------------------------------------------------
-# 7. Replacemnt Question API
+# 7. REPLACEMENT QUESTION & REAL-TIME AI GENERATOR
 # -------------------------------------------------------------------------
 @professor_bp.route("/get-replacement-question", methods=["POST"])
 def get_replacement_question():
-  data = request.json or {}
-  exclude_ids = data.get("exclude_ids", [])
-  subject = data.get("subject", None)
+    data = request.json or {}
+    exclude_ids = data.get("exclude_ids", [])
+    subject = data.get("subject", None)
 
-  db = None
-  cursor = None
-  try:
-    db = get_db_connection()
-    cursor = db.cursor()
+    db = None
+    cursor = None
+    try:
+        db = get_db_connection()
+        cursor = db.cursor()
 
-    # 1. Fetch 1 random question from question_bank
-    query = "SELECT * FROM question_bank WHERE 1=1"
-    params = []
+        query = "SELECT * FROM question_bank WHERE 1=1"
+        params = []
 
-    if exclude_ids:
-      format_strings = ",".join(["%s"] * len(exclude_ids))
-      query += f" AND id NOT IN ({format_strings})"
-      params.extend(exclude_ids)
+        if exclude_ids:
+            format_strings = ",".join(["%s"] * len(exclude_ids))
+            query += f" AND id NOT IN ({format_strings})"
+            params.extend(exclude_ids)
 
-    if subject:
-      query += " AND subject = %s"
-      params.append(subject)
+        if subject:
+            query += " AND subject = %s"
+            params.append(subject)
 
-    query += " ORDER BY RAND() LIMIT 1"
+        query += " ORDER BY RAND() LIMIT 1"
+        cursor.execute(query, params)
+        row = cursor.fetchone()
 
-    cursor.execute(query, params)
-    row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "message": "No additional questions available in database."}), 404
 
-    if not row:
-      return (
-          jsonify({
-              "success": False,
-              "message": "No additional questions available in database.",
-          }),
-          404,
-      )
+        if isinstance(row, dict):
+            q = row
+        else:
+            columns = [col[0] for col in cursor.description]
+            q = dict(zip(columns, row))
 
-    # --- SAFE DICTIONARY CONVERSION ---
-    if isinstance(row, dict):
-      q = row
-    else:
-      # Map tuple values to column names
-      columns = [col[0] for col in cursor.description]
-      q = dict(zip(columns, row))
+        q_id = q.get("id")
+        q_text = q.get("question_txt") or q.get("question_text")
 
-    q_id = q.get("id")
-    q_text = q.get("question_txt") or q.get("question_text")
+        opt_query = "SELECT * FROM answer_map WHERE question_id = %s"
+        cursor.execute(opt_query, (q_id,))
+        opt_rows = cursor.fetchall()
 
-    # 2. Fetch options from answer_map
-    opt_query = "SELECT * FROM answer_map WHERE question_id = %s"
-    cursor.execute(opt_query, (q_id,))
-    opt_rows = cursor.fetchall()
+        options = []
+        if opt_rows:
+            if isinstance(opt_rows[0], dict):
+                raw_options = opt_rows
+            else:
+                opt_cols = [col[0] for col in cursor.description]
+                raw_options = [dict(zip(opt_cols, r)) for r in opt_rows]
 
-    options = []
-    if opt_rows:
-      # Check if cursor returned dicts or tuples for answer_map
-      if isinstance(opt_rows[0], dict):
-        raw_options = opt_rows
-      else:
-        opt_cols = [col[0] for col in cursor.description]
-        raw_options = [dict(zip(opt_cols, r)) for r in opt_rows]
+            for opt in raw_options:
+                options.append({
+                    "text": str(opt.get("option_text", "")),
+                    "is_correct": bool(opt.get("is_correct")),
+                })
 
-      for opt in raw_options:
-        options.append({
-            "text": str(opt.get("option_text", "")),
-            "is_correct": bool(opt.get("is_correct")),
-        })
+        formatted_question = {
+            "id": q_id,
+            "text": q_text,
+            "question_txt": q_text,
+            "options": options,
+        }
+        return jsonify({"success": True, "question": formatted_question}), 200
 
-    # DEBUG CHECK
-    print("=" * 50)
-    print("REAL Q_ID:", q_id)
-    print("REAL QUESTION TEXT:", q_text)
-    print("REAL OPTIONS COUNT:", len(options))
-    print("=" * 50)
-
-    formatted_question = {
-        "id": q_id,
-        "text": q_text,
-        "question_txt": q_text,
-        "options": options,
-    }
-
-    return jsonify({"success": True, "question": formatted_question}), 200
-
-  except Exception as e:
-    print("Error replacing question:", str(e))
-    return jsonify({"success": False, "message": str(e)}), 500
-
-  finally:
-    if cursor:
-      cursor.close()
-    if db:
-      db.close()
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 
-# -------------------------------------------------------------------------
-# 7. Real-time AI Question Generator Using an LLM Pipeline
-# -------------------------------------------------------------------------
 @professor_bp.route('/generate-ai-questions', methods=['POST'])
 @professor_required
 def generate_ai_questions():
     file_path = None
     try:
-        # 1. Validate Uploaded File
         if 'file' not in request.files:
             return jsonify({'error': 'No document file uploaded.'}), 400
 
@@ -700,7 +769,6 @@ def generate_ai_questions():
         if file.filename == '':
             return jsonify({'error': 'No selected file.'}), 400
 
-        # 2. Extract and Validate Parameters
         course_id = request.form.get('course_id')
         if not course_id or course_id == 'undefined':
             return jsonify({'error': 'Course ID is required.'}), 400
@@ -709,24 +777,19 @@ def generate_ai_questions():
         unit = int(request.form.get('unit', 1))
         teacher_id = session.get('user_id') or session.get('id') or 1
 
-        # 3. Save File Temporarily with Sanitized Name
         filename = secure_filename(file.filename)
         temp_dir = os.path.join(current_app.root_path, 'temp')
         os.makedirs(temp_dir, exist_ok=True)
         file_path = os.path.join(temp_dir, filename)
         file.save(file_path)
 
-        # 4. Generate MCQs using AI Service Pipeline
         mcqs = generate_mcqs_from_file(file_path, num_questions=num_questions, unit=unit)
 
-        # 5. Save to Database if requested
         saved_count = 0
         save_to_db = request.form.get('save_to_db', 'true').lower() == 'true'
         if save_to_db and mcqs:
             saved_count = save_ai_questions_to_bank(mcqs, teacher_id=teacher_id, course_id=course_id, unit=unit)
-            print(f"✅ Successfully saved {saved_count} AI questions to database.")
 
-        # 6. Return Structured Response for React Modal Preview
         return jsonify({
             'status': 'success',
             'questions_generated': len(mcqs),
@@ -735,14 +798,11 @@ def generate_ai_questions():
         }), 200
 
     except Exception as e:
-        print("❌ CRITICAL ERROR IN /prof/generate-ai-questions:")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
     finally:
-        # Guaranteed Cleanup of Temporary Upload File
         if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except Exception as cleanup_err:
-                print(f"⚠️ Warning: Failed to delete temp file {file_path}: {cleanup_err}")
+            except Exception:
+                pass
