@@ -2,7 +2,7 @@ import os
 import pymysql
 import traceback
 from functools import wraps
-from flask import Blueprint, session, request, jsonify, send_file
+from flask import Blueprint, session, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
 
 from ..extensions import get_db_connection
@@ -11,6 +11,8 @@ from ..services.quiz_service import fetch_questions_by_course
 from ..services.paper_parser_service import parse_and_save_docx, parse_and_save_pdf, parse_and_save_csv
 from ..services.paper_generator_service import generate_exam_paper, get_paper_full_details
 from ..services.paper_export_service import export_paper_to_docx
+from ..services.ai_generator_service import generate_mcqs_from_file, generate_paper_questions_from_docs, save_ai_questions_to_bank
+from ..services.syllabus_service import parse_and_save_syllabus_doc
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/prof')
 
@@ -163,7 +165,7 @@ def get_course_divisions():
         return jsonify([]), 200
 
     try:
-        divisions = quiz_service.get_divisions_for_course(teacher_id, int(course_id))
+        divisions = quiz_service.get_divisions_for_publish(teacher_id, int(course_id))
         return jsonify(divisions), 200
     except Exception as e:
         print(f"Error fetching divisions: {e}")
@@ -230,12 +232,42 @@ def handle_single_question(id):
 @professor_bp.route('/questions/by_course/<int:course_id>', methods=['GET'])
 @professor_required
 def get_questions_by_course_api(course_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        questions_list = fetch_questions_by_course(course_id)
-        return jsonify(questions_list or []), 200
-    except Exception as e:
-        print(f"Error fetching questions by course: {e}")
-        return jsonify({"message": "Internal server error fetching questions."}), 500
+        # Include question_type and marks in SELECT statement
+        cursor.execute("""
+            SELECT 
+                qb.id AS question_id, 
+                qb.question_txt, 
+                qb.question_type, 
+                qb.unit, 
+                qb.marks, 
+                qb.bloom_level, 
+                qb.course_outcome
+            FROM question_bank qb
+            JOIN question_course qc ON qb.id = qc.question_id
+            WHERE qc.course_id = %s
+            ORDER BY qb.id DESC
+        """, (course_id,))
+        questions = cursor.fetchall()
+
+        # Attach options for MCQ questions
+        for q in questions:
+            if q.get('question_type') == 'MCQ':
+                cursor.execute("""
+                    SELECT id AS option_id, option_text, is_correct 
+                    FROM answer_map 
+                    WHERE question_id = %s
+                """, (q['question_id'],))
+                q['options'] = cursor.fetchall()
+            else:
+                q['options'] = []
+
+        return jsonify(questions), 200
+    finally:
+        cursor.close()
+        conn.close()
 
 @professor_bp.route('/add_questions', methods=['POST'])
 @professor_required
@@ -286,19 +318,26 @@ def generate_quiz_api():
     try:
         teacher_id = session.get('user_id') or session.get('id')
         teacher_name = session.get('username') or session.get('name') or "Professor"
-        if not teacher_id:
-                    return jsonify({"message": "User ID not found in session"}), 400
         
         data = request.get_json() or {}
         course_id = data.get('course_id')
         selected_units = data.get('units')
+        num_questions = data.get('num_questions', 10)
+        if not teacher_id:
+            return jsonify({"message": "User ID not found in session"}), 400
 
-        if not course_id:
-            return jsonify({"message": "Course ID is required to generate a quiz."}), 400
-
-        quiz_data = quiz_service.generate_and_save_quiz(teacher_id, course_id, teacher_name, selected_units)
+        quiz_data = quiz_service.generate_and_save_quiz(
+            teacher_id=teacher_id, 
+            course_id=course_id, 
+            teacher_name=teacher_name, 
+            selected_units=selected_units,
+            num_questions=num_questions
+        )
         if not quiz_data:
             return jsonify({"message": "No questions found for this course."}), 404
+        
+        if not course_id:
+            return jsonify({"message": "Course ID is required to generate a quiz."}), 400
 
         return jsonify({
             "message": "Quiz generated successfully.",
@@ -681,3 +720,143 @@ def get_replacement_question():
       cursor.close()
     if db:
       db.close()
+
+
+# -------------------------------------------------------------------------
+# 7. Real-time AI Question Generator Using an LLM Pipeline
+# -------------------------------------------------------------------------
+@professor_bp.route('/generate-ai-questions', methods=['POST'])
+@professor_required
+def generate_ai_questions():
+    file_path = None
+    try:
+        # 1. Validate Uploaded File
+        if 'file' not in request.files:
+            return jsonify({'error': 'No document file uploaded.'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file.'}), 400
+
+        # 2. Extract and Validate Parameters
+        course_id = request.form.get('course_id')
+        if not course_id or course_id == 'undefined':
+            return jsonify({'error': 'Course ID is required.'}), 400
+
+        num_questions = int(request.form.get('num_questions', 5))
+        unit = int(request.form.get('unit', 1))
+        teacher_id = session.get('user_id') or session.get('id') or 1
+
+        # 3. Save File Temporarily with Sanitized Name
+        filename = secure_filename(file.filename)
+        temp_dir = os.path.join(current_app.root_path, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        file_path = os.path.join(temp_dir, filename)
+        file.save(file_path)
+
+        # 4. Generate MCQs using AI Service Pipeline
+        mcqs = generate_mcqs_from_file(file_path, num_questions=num_questions, unit=unit)
+
+        # 5. Save to Database if requested
+        saved_count = 0
+        save_to_db = request.form.get('save_to_db', 'true').lower() == 'true'
+        if save_to_db and mcqs:
+            saved_count = save_ai_questions_to_bank(mcqs, teacher_id=teacher_id, course_id=course_id, unit=unit)
+            print(f"✅ Successfully saved {saved_count} AI questions to database.")
+
+        # 6. Return Structured Response for React Modal Preview
+        return jsonify({
+            'status': 'success',
+            'questions_generated': len(mcqs),
+            'questions_saved': saved_count,
+            'questions': mcqs
+        }), 200
+
+    except Exception as e:
+        print("❌ CRITICAL ERROR IN /prof/generate-ai-questions:")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        # Guaranteed Cleanup of Temporary Upload File
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as cleanup_err:
+                print(f"⚠️ Warning: Failed to delete temp file {file_path}: {cleanup_err}")
+
+# 8. Generate AI Questions Paper
+@professor_bp.route('/generate-paper-ai-questions', methods=['POST'])
+@professor_required
+def generate_paper_ai_questions():
+    try:
+        if 'files' not in request.files:
+            return jsonify({'error': 'No document files uploaded.'}), 400
+
+        files = request.files.getlist('files')
+        course_id = request.form.get('course_id')
+        unit = request.form.get('unit', 'AUTO')
+        question_type = request.form.get('question_type', 'MIXED') # 💡 Default set to MIXED
+        num_questions = int(request.form.get('num_questions', 8))
+
+        if not course_id:
+            return jsonify({'error': 'Course ID is required.'}), 400
+
+        saved_paths = []
+        temp_dir = os.path.join(current_app.root_path, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+
+        for f in files:
+            if f.filename != '':
+                p = os.path.join(temp_dir, secure_filename(f.filename))
+                f.save(p)
+                saved_paths.append(p)
+
+        questions = generate_paper_questions_from_docs(
+            file_paths=saved_paths,
+            course_id=course_id,
+            unit=unit,
+            num_questions=num_questions,
+            question_type=question_type
+        )
+
+        return jsonify({'questions': questions, 'count': len(questions)}), 200
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        for p in saved_paths:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+@professor_bp.route('/upload-syllabus', methods=['POST'])
+@professor_required
+def upload_syllabus_route():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No syllabus document uploaded.'}), 400
+
+    file = request.files['file']
+    course_id = request.form.get('course_id')
+
+    if not course_id:
+        return jsonify({'error': 'Course ID is required.'}), 400
+
+    temp_dir = os.path.join(current_app.root_path, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, secure_filename(file.filename))
+    file.save(temp_path)
+
+    try:
+        res = parse_and_save_syllabus_doc(temp_path, course_id)
+        return jsonify({
+            'message': f'Syllabus updated successfully for {res["units_saved"]} units!', 
+            'data': res
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)

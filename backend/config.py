@@ -1,19 +1,9 @@
 import os
 import pymysql
+from dotenv import load_dotenv
 
-# try:
-#     connection = pymysql.connect(
-#         host='public-mysql-35ccb4d9-quizapplication.d.aivencloud.com',
-#         user='avnadmin',
-#         password='AVNS_IGyQyvOs9EJELlKx9h4',
-#         database='dbquiz',
-#         port=260565
-#     )
-#     print("Successfully connected to the database using PyMySQL!")
-
-# except pymysql.MySQLError as e:
-#     print(f"Failed to connect to the database: {e}")
-    
+# Load variables from .env in project root into os.environ
+load_dotenv()
 
 class Config:
     # Database
@@ -35,3 +25,5 @@ class Config:
     DEBUG = True
     SESSION_COOKIE_SECURE = True  
     
+# --- Google Gemini AI API Key ---
+    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
