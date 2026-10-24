@@ -1236,7 +1236,7 @@ def get_student_course_history(student_id, teacher_id, course_id):
             SELECT 
                 qa.attempt_id,
                 gq.quiz_title, 
-                gq.total_marks,
+                COALESCE(gq.total_questions, 10) AS total_marks,
                 qa.total_score,
                 qa.attempt_status,
                 qa.submit_time

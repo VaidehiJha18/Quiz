@@ -38,3 +38,4 @@ pymysql
 pandas
 openpyxl
 flask-excel
+python-dotenv

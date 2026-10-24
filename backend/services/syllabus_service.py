@@ -1,10 +1,18 @@
 import os
 import json
-import PyPDF2
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
 import docx
 import pymysql
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    # from google.genai import types
+except ImportError:
+    genai = types = None
+# from google import genai
+# from google.genai import types
 from backend.extensions import get_db_connection
 
 def extract_text_from_file(file_path):

@@ -1,14 +1,26 @@
 import os
 import json
 import time
-import PyPDF2
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
 import docx
 import pymysql
-from pptx import Presentation
+try:
+    from pptx import Presentation
+except ImportError:
+    Presentation = None
 from flask import current_app
-from google import genai
-from google.genai import types
-from google.genai import errors
+try:
+    from google import genai
+    # from google.genai import types
+    # from google.genai import errors
+except ImportError:
+    genai = types = errors = None
+# from google import genai
+# from google.genai import types
+# from google.genai import errors
 from backend.extensions import get_db_connection
 
 # Comprehensive list of valid Google Gemini models with automatic fallback
