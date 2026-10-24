@@ -429,9 +429,13 @@ def get_quiz_results_table_endpoint(quiz_id):
             SELECT 
                 qa.attempt_id,
                 sqa.student_id,
-                CAST(sqa.student_id AS CHAR) AS enrollment_no,
-                ua.user_name AS name,
+                COALESCE(s.enrollment_no, CAST(sqa.student_id AS CHAR)) AS enrollment_no,
+                COALESCE(s.f_name, ua.user_name) AS f_name,
+                COALESCE(s.l_name, '') AS l_name,
+                COALESCE(TRIM(CONCAT(COALESCE(s.f_name, ''), ' ', COALESCE(s.l_name, ''))), ua.user_name) AS name,
+                COALESCE(qa.total_score, 0) AS total_score,
                 COALESCE(qa.total_score, 0) AS final_score,
+                qa.submit_time,
                 qa.submit_time AS submitted_at,
                 qa.is_published,
                 COALESCE(TIMESTAMPDIFF(SECOND, qa.start_time, qa.submit_time), 0) AS duration_seconds,
@@ -439,10 +443,11 @@ def get_quiz_results_table_endpoint(quiz_id):
                 GROUP_CONCAT(DISTINCT v.violation_type SEPARATOR ', ') AS violations_triggered
             FROM quiz_attempt qa
             JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
-            JOIN user_account ua ON sqa.student_id = ua.user_id
+            LEFT JOIN student s ON sqa.student_id = s.id
+            LEFT JOIN user_account ua ON sqa.student_id = ua.user_id
             LEFT JOIN violations v ON sqa.quiz_id = v.quiz_id AND sqa.student_id = v.student_id
             WHERE sqa.quiz_id = %s
-            GROUP BY qa.attempt_id, sqa.student_id, ua.user_name, qa.total_score, qa.submit_time, qa.is_published, qa.start_time
+            GROUP BY qa.attempt_id, sqa.student_id, s.enrollment_no, s.f_name, s.l_name, ua.user_name, qa.total_score, qa.submit_time, qa.is_published, qa.start_time
             ORDER BY qa.submit_time DESC
         """
         cursor.execute(sql, (quiz_id,))
@@ -451,12 +456,53 @@ def get_quiz_results_table_endpoint(quiz_id):
         for r in rows:
             if not r.get('violations_triggered'):
                 r['violations_triggered'] = 'None'
-            if isinstance(r.get('submitted_at'), datetime):
+            if isinstance(r.get('submit_time'), (datetime, date)):
+                r['submit_time'] = r['submit_time'].isoformat()
+            if isinstance(r.get('submitted_at'), (datetime, date)):
                 r['submitted_at'] = r['submitted_at'].strftime("%m/%d/%Y, %I:%M:%S %p")
 
         return jsonify(rows), 200
     except Exception as e:
         print(f"Error fetching quiz results table: {e}")
+        return jsonify([]), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@professor_bp.route('/quiz-pending-students/<int:quiz_id>', methods=['GET'])
+@professor_required
+def get_quiz_pending_students_endpoint(quiz_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        sql = """
+            SELECT 
+                s.id AS student_id,
+                COALESCE(s.enrollment_no, CAST(s.id AS CHAR)) AS enrollment_no,
+                COALESCE(s.f_name, '') AS f_name,
+                COALESCE(s.l_name, '') AS l_name,
+                COALESCE(TRIM(CONCAT(COALESCE(s.f_name, ''), ' ', COALESCE(s.l_name, ''))), 'N/A') AS name,
+                COALESCE(s.email, 'N/A') AS email,
+                'Not Attempted' AS status
+            FROM student s
+            JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
+            JOIN quiz_semester_course_division qscd 
+                ON psdbs.division_id = qscd.division_id 
+                AND psdbs.semester_id = qscd.semester_id
+            WHERE qscd.quiz_id = %s
+              AND s.id NOT IN (
+                  SELECT sqa.student_id 
+                  FROM student_quiz_attempt sqa 
+                  WHERE sqa.quiz_id = %s
+              )
+            ORDER BY s.enrollment_no ASC
+        """
+        cursor.execute(sql, (quiz_id, quiz_id))
+        rows = cursor.fetchall() or []
+        return jsonify(rows), 200
+    except Exception as e:
+        print(f"Error fetching pending students: {e}")
         return jsonify([]), 500
     finally:
         cursor.close()
@@ -487,8 +533,8 @@ def get_all_attempts():
                 qa.attempt_id AS id,
                 sqa.student_id AS studentId,
                 sqa.quiz_id AS quizId,
-                ua.user_name AS studentName,
-                CAST(sqa.student_id AS CHAR) AS enrollmentNo,
+                COALESCE(TRIM(CONCAT(COALESCE(s.f_name, ''), ' ', COALESCE(s.l_name, ''))), ua.user_name) AS studentName,
+                COALESCE(s.enrollment_no, CAST(sqa.student_id AS CHAR)) AS enrollmentNo,
                 qa.total_score AS finalScore,
                 qa.submit_time AS submittedAt,
                 CASE 
@@ -500,9 +546,10 @@ def get_all_attempts():
                 GROUP_CONCAT(DISTINCT v.violation_type SEPARATOR ', ') AS violationsTriggered
             FROM quiz_attempt qa
             JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
-            JOIN user_account ua ON sqa.student_id = ua.user_id
+            LEFT JOIN student s ON sqa.student_id = s.id
+            LEFT JOIN user_account ua ON sqa.student_id = ua.user_id
             LEFT JOIN violations v ON sqa.quiz_id = v.quiz_id AND sqa.student_id = v.student_id
-            GROUP BY qa.attempt_id, sqa.student_id, sqa.quiz_id, ua.user_name, qa.total_score, qa.submit_time, qa.start_time
+            GROUP BY qa.attempt_id, sqa.student_id, sqa.quiz_id, s.enrollment_no, s.f_name, s.l_name, ua.user_name, qa.total_score, qa.submit_time, qa.start_time
             ORDER BY qa.start_time DESC
         """
         cursor.execute(sql)

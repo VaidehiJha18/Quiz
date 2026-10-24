@@ -150,37 +150,50 @@ export default function ResultsPage({ role }) {
     ...(role !== 'student' ? [{ Header: 'Actions', accessor: 'actions' }] : [])
   ];
 
-  const submittedData = results.map((r) => ({
-    attemptId: r.attempt_id || '-',
-    enrollmentNo: r.enrollment_no || 'N/A',
-    name: `${r.f_name} ${r.l_name}`,
-    score: r.total_score !== null ? (
-      <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{r.total_score}</span>
-    ) : 'N/A',
-    endTime: r.submit_time ? new Date(r.submit_time).toLocaleString() : '-',
-    
-    // ✅ Logic to display Hidden vs Published
-    status: r.is_published ? (
-      <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Published</span>
-    ) : (
-      <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Hidden</span>
-    ),
+  const submittedData = results.map((r) => {
+    const studentName = (r.f_name || r.l_name)
+      ? `${r.f_name || ''} ${r.l_name || ''}`.trim()
+      : (r.name || 'N/A');
+    const finalScore = (r.total_score !== undefined && r.total_score !== null)
+      ? parseFloat(r.total_score).toFixed(2)
+      : (r.final_score !== undefined && r.final_score !== null)
+        ? parseFloat(r.final_score).toFixed(2)
+        : 'N/A';
+    const submittedTime = r.submit_time || r.submitted_at;
+    const formattedDate = submittedTime ? new Date(submittedTime).toLocaleString() : '-';
 
-    responseLink: (
-      <a href={`/result/${r.attempt_id}`} target="_blank" rel="noreferrer" style={{ color: 'blue', textDecoration: 'underline' }}>
-        View Answer Sheet
-      </a>
-    ),
-    
-    actions: role !== 'student' && (
-      <button 
-        onClick={() => handleDeleteAttempt(r.attempt_id)}
-        style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-      >
-        Delete
-      </button>
-    )
-  }));
+    return {
+      attemptId: r.attempt_id || '-',
+      enrollmentNo: r.enrollment_no || 'N/A',
+      name: studentName,
+      score: finalScore !== 'N/A' ? (
+        <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{finalScore}</span>
+      ) : 'N/A',
+      endTime: formattedDate,
+      
+      // ✅ Logic to display Hidden vs Published
+      status: r.is_published ? (
+        <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Published</span>
+      ) : (
+        <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Hidden</span>
+      ),
+
+      responseLink: (
+        <a href={`/result/${r.attempt_id}`} target="_blank" rel="noreferrer" style={{ color: 'blue', textDecoration: 'underline' }}>
+          View Answer Sheet
+        </a>
+      ),
+      
+      actions: role !== 'student' && (
+        <button 
+          onClick={() => handleDeleteAttempt(r.attempt_id)}
+          style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          Delete
+        </button>
+      )
+    };
+  });
 
   // --- MISSING STUDENTS TABLE COLUMNS ---
   const pendingColumns = [
