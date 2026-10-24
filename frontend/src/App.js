@@ -6,6 +6,8 @@ import AdminManageUsersPage from './pages/AdminManageUsersPage';
 import AdminRoute from './components/layout/AdminRoute';
 import AdminSystemSetupPage from './pages/AdminSystemSetupPage';
 import AdminDashboardHub from './pages/AdminDashboardHub';
+import GenerateCustomPaperPage from './pages/GenerateCustomPaperPage';
+import PaperPreviewPage from './pages/PaperPreviewPage';
 
 // ✅ 1. IMPORT THE NEW LAYOUT COMPONENT
 import ProfessorLayout from './components/layout/ProfessorLayout';
@@ -65,6 +67,10 @@ function App() {
           <Route path="generate-quiz" element={<GenerateQuizPage />} />
           <Route path="/professor/analytics" element={<ProfessorAnalyticsPage />} />
           <Route path="students" element={<ManageStudentsPage />} />
+
+          <Route path="generate-paper" element={<GenerateCustomPaperPage />} />
+          <Route path="paper-preview/:paperId" element={<PaperPreviewPage />} />
+          
         </Route>
 
         {/* ========================================================= */}
