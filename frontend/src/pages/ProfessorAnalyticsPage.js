@@ -13,6 +13,7 @@ export default function ProfessorAnalyticsPage() {
   // Filters State
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedDivisionId, setSelectedDivisionId] = useState('');
   const [selectedQuizId, setSelectedQuizId] = useState('all');
 
   // Analytics State
@@ -20,22 +21,37 @@ export default function ProfessorAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Quizzes for currently selected course
-  const currentQuizzes = useMemo(() => {
-    if (!selectedCourseId || !courses || courses.length === 0) return [];
-    const course = courses.find((c) => String(c.id) === String(selectedCourseId));
-    return course ? course.quizzes || [] : [];
+  // Selected Course Object
+  const currentCourse = useMemo(() => {
+    if (!selectedCourseId || !courses) return null;
+    return courses.find((c) => String(c.id) === String(selectedCourseId)) || null;
   }, [courses, selectedCourseId]);
 
-  // Load analytics for specific course & quiz
-  const loadAnalytics = async (courseId, quizId) => {
-    if (!courseId) {
+  // Divisions for currently selected course
+  const currentDivisions = useMemo(() => {
+    return currentCourse ? currentCourse.divisions || [] : [];
+  }, [currentCourse]);
+
+  // Selected Division Object
+  const currentDivision = useMemo(() => {
+    if (!selectedDivisionId || !currentDivisions) return null;
+    return currentDivisions.find((d) => String(d.division_id) === String(selectedDivisionId)) || null;
+  }, [currentDivisions, selectedDivisionId]);
+
+  // Quizzes for currently selected division
+  const currentQuizzes = useMemo(() => {
+    return currentDivision ? currentDivision.quizzes || [] : [];
+  }, [currentDivision]);
+
+  // Load analytics for specific course, division & quiz
+  const loadAnalytics = async (courseId, divisionId, quizId) => {
+    if (!courseId || !divisionId) {
       setAnalytics(null);
       return;
     }
     setLoading(true);
     try {
-      const params = { course_id: courseId };
+      const params = { course_id: courseId, division_id: divisionId };
       if (quizId && quizId !== 'all') params.quiz_id = quizId;
 
       const res = await api.get('/prof/analytics', { params });
@@ -58,16 +74,16 @@ export default function ProfessorAnalyticsPage() {
           const loaded = res.data.available_courses.map((c) => ({
             id: String(c.course_id),
             name: c.course_name,
+            divisions: c.divisions || [],
             quizzes: c.quizzes || []
           }));
           setCourses(loaded);
         } else {
-          // Fallback if needed
-          setCourses([{ id: '27', name: 'Database Management System', quizzes: [] }]);
+          setCourses([]);
         }
       } catch (err) {
         console.error('Error fetching courses list:', err);
-        setCourses([{ id: '27', name: 'Database Management System', quizzes: [] }]);
+        setCourses([]);
       }
     };
 
@@ -78,9 +94,17 @@ export default function ProfessorAnalyticsPage() {
   const handleCourseChange = (e) => {
     const newCourseId = e.target.value;
     setSelectedCourseId(newCourseId);
+    setSelectedDivisionId('');
     setSelectedQuizId('all');
-    if (newCourseId) {
-      loadAnalytics(newCourseId, 'all');
+    setAnalytics(null);
+  };
+
+  const handleDivisionChange = (e) => {
+    const newDivisionId = e.target.value;
+    setSelectedDivisionId(newDivisionId);
+    setSelectedQuizId('all');
+    if (newDivisionId && selectedCourseId) {
+      loadAnalytics(selectedCourseId, newDivisionId, 'all');
     } else {
       setAnalytics(null);
     }
@@ -89,20 +113,23 @@ export default function ProfessorAnalyticsPage() {
   const handleQuizChange = (e) => {
     const newQuizId = e.target.value;
     setSelectedQuizId(newQuizId);
-    if (selectedCourseId) {
-      loadAnalytics(selectedCourseId, newQuizId);
+    if (selectedCourseId && selectedDivisionId) {
+      loadAnalytics(selectedCourseId, selectedDivisionId, newQuizId);
     }
   };
 
   // CSV Export handler
   const handleDownloadReport = async () => {
-    if (!selectedCourseId) {
-      alert('Please select a subject first.');
+    if (!selectedCourseId || !selectedDivisionId) {
+      alert('Please select a subject and division first.');
       return;
     }
     setIsExporting(true);
     try {
-      const params = { course_id: selectedCourseId };
+      const params = { 
+        course_id: selectedCourseId,
+        division_id: selectedDivisionId
+      };
       if (selectedQuizId && selectedQuizId !== 'all') params.quiz_id = selectedQuizId;
 
       const res = await api.get('/prof/export-marks', { params });
@@ -127,7 +154,7 @@ export default function ProfessorAnalyticsPage() {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `Student_Marks_${selectedQuizId !== 'all' ? `Quiz_${selectedQuizId}` : 'Report'}.csv`);
+      link.setAttribute('download', `Student_Marks_${selectedCourseId}_Div${selectedDivisionId}_${selectedQuizId !== 'all' ? `Quiz_${selectedQuizId}` : 'Report'}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -503,7 +530,7 @@ export default function ProfessorAnalyticsPage() {
             <button 
               onClick={handleDownloadReport} 
               className="export-btn" 
-              disabled={isExporting || !selectedCourseId}
+              disabled={isExporting || !selectedCourseId || !selectedDivisionId}
             >
               {isExporting ? 'Exporting...' : 'Export CSV Marks'}
             </button>
@@ -527,12 +554,29 @@ export default function ProfessorAnalyticsPage() {
             </div>
 
             <div className="filter-group">
-              <label className="filter-label">2. Select Quiz</label>
+              <label className="filter-label">2. Select Division</label>
+              <select
+                className="custom-select"
+                value={selectedDivisionId}
+                onChange={handleDivisionChange}
+                disabled={!selectedCourseId || currentDivisions.length === 0}
+              >
+                <option value="">-- Select Division --</option>
+                {currentDivisions.map((d) => (
+                  <option key={d.division_id} value={d.division_id}>
+                    {d.division_name || `Division ${d.division}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">3. Select Quiz</label>
               <select
                 className="custom-select"
                 value={selectedQuizId}
                 onChange={handleQuizChange}
-                disabled={!selectedCourseId || currentQuizzes.length === 0}
+                disabled={!selectedDivisionId || currentQuizzes.length === 0}
               >
                 <option value="all">All Quizzes</option>
                 {currentQuizzes.map((q, idx) => (
@@ -545,8 +589,8 @@ export default function ProfessorAnalyticsPage() {
           </div>
         </div>
 
-        {!selectedCourseId ? (
-          <div className="select-prompt">Please select a subject to view performance analytics.</div>
+        {!selectedCourseId || !selectedDivisionId ? (
+          <div className="select-prompt">Please select a subject and division to view performance analytics.</div>
         ) : loading && !analytics ? (
           <div className="loading-state">Loading analytics...</div>
         ) : (

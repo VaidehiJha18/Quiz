@@ -822,45 +822,90 @@ def get_professor_results_table(quiz_id):
         conn.close()
 
 
-# --- ANALYTICS DASHBOARD --- ❤️❤️❤️❤️❤️❤️
+# --- ANALYTICS DASHBOARD ---
 
-def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
+def get_dashboard_analytics(teacher_id, course_id=None, division_id=None, quiz_id=None):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # 1. Fetch Teacher's Courses and their Quizzes for the dropdown filters
+        # 1. Fetch Teacher's Courses and their Divisions & Quizzes for dropdown filters
         sql_courses = """
-            SELECT DISTINCT c.id AS course_id, c.course_name
-            FROM course c
-            JOIN quizzes q ON c.id = q.course_id
-            WHERE q.teacher_id = %s
-            UNION
             SELECT DISTINCT c.id AS course_id, c.course_name
             FROM course c
             JOIN teacher_course_division tcd ON c.id = tcd.course_id
             WHERE tcd.teacher_id = %s
+            UNION
+            SELECT DISTINCT c.id AS course_id, c.course_name
+            FROM course c
+            JOIN quizzes q ON c.id = q.course_id
+            WHERE q.teacher_id = %s
             ORDER BY course_name ASC
         """
         cursor.execute(sql_courses, (teacher_id, teacher_id))
         available_courses = cursor.fetchall() or []
 
         for c_item in available_courses:
+            cid = c_item['course_id']
+            sql_divs = """
+                SELECT DISTINCT d.id AS division_id, d.division
+                FROM division d
+                JOIN teacher_course_division tcd ON d.id = tcd.division_id
+                WHERE tcd.teacher_id = %s AND tcd.course_id = %s
+                UNION
+                SELECT DISTINCT d.id AS division_id, d.division
+                FROM division d
+                JOIN quiz_semester_course_division qscd ON d.id = qscd.division_id
+                JOIN quizzes q ON qscd.quiz_id = q.id
+                WHERE q.teacher_id = %s AND qscd.course_id = %s
+                ORDER BY division ASC
+            """
+            cursor.execute(sql_divs, (teacher_id, cid, teacher_id, cid))
+            raw_divs = cursor.fetchall() or []
+            divisions = []
+            for d in raw_divs:
+                did = d['division_id']
+                div_letter = d['division']
+                dname = f"Division {div_letter}" if not str(div_letter).lower().startswith('division') else str(div_letter)
+                sql_quizzes = """
+                    SELECT DISTINCT q.id AS quiz_id, q.quiz_title, q.created_at, q.time_limit, q.total_questions
+                    FROM quizzes q
+                    JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+                    WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
+                    ORDER BY q.id ASC
+                """
+                cursor.execute(sql_quizzes, (teacher_id, cid, did))
+                q_list = cursor.fetchall() or []
+                divisions.append({
+                    "division_id": did,
+                    "division_name": dname,
+                    "division": div_letter,
+                    "quizzes": q_list
+                })
+            c_item['divisions'] = divisions
             cursor.execute("""
                 SELECT id AS quiz_id, quiz_title, created_at, time_limit, total_questions
                 FROM quizzes
                 WHERE teacher_id = %s AND course_id = %s
                 ORDER BY id ASC
-            """, (teacher_id, c_item['course_id']))
+            """, (teacher_id, cid))
             c_item['quizzes'] = cursor.fetchall() or []
 
-        # If course_id is not specified or not in available courses, default to first available course
-        if not course_id and available_courses:
-            course_id = available_courses[0]['course_id']
-        elif course_id:
+        # Parse filter parameters safely
+        if course_id and str(course_id).lower() not in ('all', '', 'null', 'undefined'):
             try:
                 course_id = int(course_id)
             except (ValueError, TypeError):
-                course_id = available_courses[0]['course_id'] if available_courses else None
+                course_id = None
+        else:
+            course_id = None
+
+        if division_id and str(division_id).lower() not in ('all', '', 'null', 'undefined'):
+            try:
+                division_id = int(division_id)
+            except (ValueError, TypeError):
+                division_id = None
+        else:
+            division_id = None
 
         if quiz_id and str(quiz_id).lower() not in ('all', '', 'null', 'undefined'):
             try:
@@ -870,36 +915,66 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
         else:
             quiz_id = None
 
-        # 2. Enrolled Students in this course
-        enrolled_students = 0
-        if course_id:
-            cursor.execute("""
-                SELECT COUNT(DISTINCT psdbs.student_id) AS enrolled
-                FROM program_semester_division_batch_student psdbs
-                JOIN teacher_course_division tcd ON psdbs.division_id = tcd.division_id
-                WHERE tcd.teacher_id = %s AND tcd.course_id = %s
-            """, (teacher_id, course_id))
-            row = cursor.fetchone()
-            enrolled_students = row['enrolled'] if row and row['enrolled'] else 0
+        # If course or division is not selected, return metadata only
+        if not course_id or not division_id:
+            return {
+                "available_courses": available_courses,
+                "selected_course_id": course_id,
+                "selected_division_id": division_id,
+                "selected_quiz_id": quiz_id,
+                "total_quizzes": 0,
+                "turnout_display": "0 / 0 (0%)",
+                "total_attempts": 0,
+                "unique_students": 0,
+                "enrolled_students": 0,
+                "average_score": 0.0,
+                "highest_score": 0.0,
+                "lowest_score": 0.0,
+                "avg_duration_formatted": "0m 0s",
+                "time_limit_minutes": 20,
+                "at_risk_count": 0,
+                "grade_distribution": [
+                    {"bracket": "90% - 100%", "label": "Excellent (9.0 - 10.0)", "count": 0, "color": "#10b981"},
+                    {"bracket": "75% - 89%", "label": "Good (7.5 - 8.9)", "count": 0, "color": "#3b82f6"},
+                    {"bracket": "50% - 74%", "label": "Average (5.0 - 7.4)", "count": 0, "color": "#f59e0b"},
+                    {"bracket": "< 50%", "label": "Needs Support (< 5.0)", "count": 0, "color": "#ef4444"}
+                ],
+                "distribution_total": 0,
+                "toughest_question": None,
+                "easiest_question": None,
+                "progression": [],
+                "students_needing_support": [],
+                "recent_activity": []
+            }
 
-        # If not found via teacher_course_division, fallback to unique student attempts in this course
-        if enrolled_students == 0 and course_id:
+        # 2. Enrolled Students in this division
+        cursor.execute("""
+            SELECT COUNT(DISTINCT psdbs.student_id) AS enrolled
+            FROM program_semester_division_batch_student psdbs
+            WHERE psdbs.division_id = %s
+        """, (division_id,))
+        row = cursor.fetchone()
+        enrolled_students = row['enrolled'] if row and row['enrolled'] else 0
+
+        # Fallback if division mapping is missing
+        if enrolled_students == 0:
             cursor.execute("""
                 SELECT COUNT(DISTINCT sqa.student_id) AS enrolled
                 FROM quizzes q
+                JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
                 JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
-                WHERE q.teacher_id = %s AND q.course_id = %s
-            """, (teacher_id, course_id))
+                WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
+            """, (teacher_id, course_id, division_id))
             row = cursor.fetchone()
             enrolled_students = row['enrolled'] if row and row['enrolled'] else 0
 
         # 3. Main Stats Query
-        where_clauses = ["q.teacher_id = %s"]
-        params = [teacher_id]
-
-        if course_id:
-            where_clauses.append("q.course_id = %s")
-            params.append(course_id)
+        where_clauses = [
+            "q.teacher_id = %s",
+            "qscd.course_id = %s",
+            "qscd.division_id = %s"
+        ]
+        params = [teacher_id, course_id, division_id]
 
         if quiz_id:
             where_clauses.append("sqa.quiz_id = %s")
@@ -920,6 +995,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 SUM(CASE WHEN qa.total_score >= 5.0 AND qa.total_score < 7.5 THEN 1 ELSE 0 END) as b_50_74,
                 SUM(CASE WHEN qa.total_score < 5.0 THEN 1 ELSE 0 END) as b_below_50
             FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
             JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             WHERE {where_sql}
@@ -945,8 +1021,8 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
         else:
             turnout_display = "0 / 0 (0%)"
 
-        if not quiz_id and course_id:
-            # Per-student overall course average across all quizzes
+        if not quiz_id:
+            # Per-student overall course average across all quizzes in this division
             cursor.execute(f"""
                 SELECT 
                     SUM(CASE WHEN student_avg >= 9.0 THEN 1 ELSE 0 END) AS b_90_100,
@@ -957,6 +1033,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 FROM (
                     SELECT sqa.student_id, AVG(qa.total_score) AS student_avg
                     FROM quizzes q
+                    JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
                     JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
                     JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
                     WHERE {where_sql}
@@ -996,6 +1073,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
             JOIN question_bank qb ON ar.question_id = qb.id
             JOIN student_quiz_attempt sqa ON ar.attempt_id = sqa.attempt_id
             JOIN quizzes q ON sqa.quiz_id = q.id
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             WHERE {where_sql}
             GROUP BY qb.id, qb.question_txt, qb.unit
             ORDER BY correct_pct ASC
@@ -1023,39 +1101,39 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 "total_responses": int(question_stats[-1]['total_responses'])
             }
 
-        # 5. Quiz-over-Quiz Progression Line (Across all quizzes of this course)
+        # 5. Quiz-over-Quiz Progression Line (Across all quizzes for this course & division)
         progression = []
-        if course_id:
-            cursor.execute("""
-                SELECT 
-                    q.id AS quiz_id,
-                    q.quiz_title,
-                    COUNT(qa.attempt_id) AS attempt_count,
-                    ROUND(AVG(qa.total_score), 2) AS average_score,
-                    MAX(qa.total_score) AS highest_score,
-                    MIN(qa.total_score) AS lowest_score
-                FROM quizzes q
-                LEFT JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
-                LEFT JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
-                WHERE q.teacher_id = %s AND q.course_id = %s
-                GROUP BY q.id, q.quiz_title, q.created_at
-                ORDER BY q.id ASC
-            """, (teacher_id, course_id))
-            p_rows = cursor.fetchall() or []
-            for idx, pr in enumerate(p_rows):
-                progression.append({
-                    "quiz_id": pr['quiz_id'],
-                    "quiz_title": pr['quiz_title'],
-                    "short_label": f"Q{idx + 1}",
-                    "average_score": float(pr['average_score'] or 0.0),
-                    "highest_score": float(pr['highest_score'] or 0.0),
-                    "lowest_score": float(pr['lowest_score'] or 0.0),
-                    "attempt_count": int(pr['attempt_count'] or 0)
-                })
+        cursor.execute("""
+            SELECT 
+                q.id AS quiz_id,
+                q.quiz_title,
+                COUNT(qa.attempt_id) AS attempt_count,
+                ROUND(AVG(qa.total_score), 2) AS average_score,
+                MAX(qa.total_score) AS highest_score,
+                MIN(qa.total_score) AS lowest_score
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            LEFT JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
+            LEFT JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
+            GROUP BY q.id, q.quiz_title, q.created_at
+            ORDER BY q.id ASC
+        """, (teacher_id, course_id, division_id))
+        p_rows = cursor.fetchall() or []
+        for idx, pr in enumerate(p_rows):
+            progression.append({
+                "quiz_id": pr['quiz_id'],
+                "quiz_title": pr['quiz_title'],
+                "short_label": f"Q{idx + 1}",
+                "average_score": float(pr['average_score'] or 0.0),
+                "highest_score": float(pr['highest_score'] or 0.0),
+                "lowest_score": float(pr['lowest_score'] or 0.0),
+                "attempt_count": int(pr['attempt_count'] or 0)
+            })
 
         # 6. Students Needing Support Table (< 50%)
         students_needing_support = []
-        if not quiz_id and course_id:
+        if not quiz_id:
             sql_support = f"""
                 SELECT 
                     s.id AS student_id,
@@ -1066,6 +1144,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 FROM (
                     SELECT sqa.student_id, AVG(qa.total_score) AS student_avg
                     FROM quizzes q
+                    JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
                     JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
                     JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
                     WHERE {where_sql}
@@ -1077,15 +1156,17 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 JOIN student_quiz_attempt sqa ON s.id = sqa.student_id
                 JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
                 JOIN quizzes q ON sqa.quiz_id = q.id AND q.teacher_id = %s AND q.course_id = %s
+                JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id AND qscd.division_id = %s
                 JOIN (
-                    SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) as num
-                    FROM quizzes
-                    WHERE teacher_id = %s AND course_id = %s
+                    SELECT q.id, ROW_NUMBER() OVER (ORDER BY q.id ASC) as num
+                    FROM quizzes q
+                    JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+                    WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
                 ) q_num ON q.id = q_num.id
                 GROUP BY s.id, s.enrollment_no, s.f_name, s.l_name, ua.user_name
                 ORDER BY avg_score ASC
             """
-            cursor.execute(sql_support, tuple(params) + (teacher_id, course_id, teacher_id, course_id))
+            cursor.execute(sql_support, tuple(params) + (teacher_id, course_id, division_id, teacher_id, course_id, division_id))
             support_rows = cursor.fetchall() or []
             for sr in support_rows:
                 students_needing_support.append({
@@ -1109,6 +1190,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 FROM quiz_attempt qa
                 JOIN student_quiz_attempt sqa ON qa.attempt_id = sqa.attempt_id
                 JOIN quizzes q ON sqa.quiz_id = q.id
+                JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
                 LEFT JOIN student s ON sqa.student_id = s.id
                 LEFT JOIN user_account ua ON sqa.student_id = ua.user_id
                 WHERE {where_sql} AND qa.total_score < 5.0
@@ -1142,6 +1224,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 qa.total_score,
                 qa.submit_time
             FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
             JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             LEFT JOIN student s ON sqa.student_id = s.id
@@ -1157,13 +1240,20 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
                 act['submit_time'] = act['submit_time'].strftime("%b %d, %I:%M %p")
             act['total_score'] = float(act['total_score'] or 0.0)
 
-        # Count total quizzes by this teacher
-        cursor.execute("SELECT COUNT(id) AS total_quizzes FROM quizzes WHERE teacher_id = %s", (teacher_id,))
-        total_quizzes = cursor.fetchone()['total_quizzes'] or len(available_courses)
+        # Count total quizzes by this teacher in this division
+        cursor.execute("""
+            SELECT COUNT(DISTINCT q.id) AS total_quizzes 
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
+        """, (teacher_id, course_id, division_id))
+        q_row = cursor.fetchone()
+        total_quizzes = q_row['total_quizzes'] if q_row and q_row['total_quizzes'] else len(progression)
 
         return {
             "available_courses": available_courses,
             "selected_course_id": course_id,
+            "selected_division_id": division_id,
             "selected_quiz_id": quiz_id,
             "total_quizzes": total_quizzes,
             "turnout_display": turnout_display,
@@ -1188,7 +1278,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, quiz_id=None):
         cursor.close()
         conn.close()
 
-def get_all_student_marks_for_export(teacher_id, course_id=None, quiz_id=None):
+def get_all_student_marks_for_export(teacher_id, course_id=None, division_id=None, quiz_id=None):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -1197,8 +1287,15 @@ def get_all_student_marks_for_export(teacher_id, course_id=None, quiz_id=None):
 
         if course_id:
             try:
-                where_clauses.append("q.course_id = %s")
+                where_clauses.append("qscd.course_id = %s")
                 params.append(int(course_id))
+            except (ValueError, TypeError):
+                pass
+
+        if division_id and str(division_id).lower() not in ('all', '', 'null', 'undefined'):
+            try:
+                where_clauses.append("qscd.division_id = %s")
+                params.append(int(division_id))
             except (ValueError, TypeError):
                 pass
 
@@ -1222,6 +1319,7 @@ def get_all_student_marks_for_export(teacher_id, course_id=None, quiz_id=None):
                 qa.total_score, 
                 qa.submit_time
             FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
             JOIN student_quiz_attempt sqa ON q.id = sqa.quiz_id
             JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
             LEFT JOIN student s ON sqa.student_id = s.id
@@ -1233,16 +1331,13 @@ def get_all_student_marks_for_export(teacher_id, course_id=None, quiz_id=None):
         cursor.execute(sql, tuple(params))
         rows = cursor.fetchall() or []
         for r in rows:
-            if r['submit_time']:
-                r['submit_time'] = r['submit_time'].isoformat()
-            r['total_score'] = float(r['total_score'] or 0.0)
+            if r.get('total_score') is not None:
+                r['total_score'] = float(r['total_score'])
         return rows
     finally:
         cursor.close()
         conn.close()
 
-# 🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮🏮
-# STUDENT SIDE ❤️❤️❤️
 def get_quiz_for_student(token):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -1524,34 +1619,103 @@ def get_pending_students(quiz_id):
         conn.close()
 
 
-# ❤️❤️❤️ --- Professor's Manage Students Page --- ❤️❤️❤️
-def get_professor_course_roster(teacher_id, course_id):
-    """Fetches all students in a specific course along with their average quiz score."""
+# --- Professor's Manage Students Page ---
+def get_professor_course_roster(teacher_id, course_id, division_id=None):
+    """Fetches all students in a specific course and division along with their quizzes attempted, total quizzes, and average quiz score."""
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        # The FIX: Added semester_course 'sc' join to strictly filter out students from other semesters
-        sql = """
-            SELECT 
-                s.id as student_id, 
-                s.enrollment_no, 
-                CONCAT(s.f_name, ' ', s.l_name) as student_name,
-                s.email,
-                ROUND(AVG(CASE WHEN qscd.course_id = tcd.course_id THEN qa.total_score ELSE NULL END), 2) as avg_score
-            FROM student s
-            JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
-            JOIN teacher_course_division tcd ON psdbs.division_id = tcd.division_id
-            JOIN semester_course sc ON psdbs.semester_id = sc.semester_id AND sc.course_id = tcd.course_id
-            LEFT JOIN student_quiz_attempt sqa ON s.id = sqa.student_id
-            LEFT JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id AND qa.attempt_status = 'submitted'
-            LEFT JOIN quizzes gq ON sqa.quiz_id = gq.id
-            LEFT JOIN quiz_semester_course_division qscd ON gq.id = qscd.quiz_id
-            WHERE tcd.teacher_id = %s AND tcd.course_id = %s
-            GROUP BY s.id, s.enrollment_no, student_name, s.email
-            ORDER BY s.enrollment_no ASC
-        """
-        cursor.execute(sql, (teacher_id, course_id))
-        return cursor.fetchall()
+        if division_id:
+            sql = """
+                SELECT 
+                    s.id as student_id,
+                    COALESCE(s.enrollment_no, CAST(s.id AS CHAR)) as enrollment_no,
+                    COALESCE(TRIM(CONCAT(COALESCE(s.f_name, ''), ' ', COALESCE(s.l_name, ''))), ua.user_name) as student_name,
+                    s.email,
+                    COUNT(DISTINCT qa.attempt_id) as quizzes_attempted,
+                    (
+                        SELECT COUNT(DISTINCT q.id)
+                        FROM quizzes q
+                        JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+                        WHERE qscd.course_id = %s AND qscd.division_id = %s AND q.teacher_id = %s
+                    ) as total_quizzes,
+                    ROUND(AVG(qa.total_score), 2) as avg_score
+                FROM student s
+                JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
+                LEFT JOIN user_account ua ON s.id = ua.user_id
+                LEFT JOIN (
+                    SELECT sqa.student_id, sqa.quiz_id, qa.attempt_id, qa.total_score
+                    FROM student_quiz_attempt sqa
+                    JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id AND qa.attempt_status = 'submitted'
+                    JOIN quizzes q ON sqa.quiz_id = q.id
+                    JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+                    WHERE qscd.course_id = %s AND qscd.division_id = %s AND q.teacher_id = %s
+                ) qa ON s.id = qa.student_id
+                WHERE psdbs.division_id = %s
+                GROUP BY s.id, s.enrollment_no, student_name, s.email
+                ORDER BY s.enrollment_no ASC
+            """
+            cursor.execute(sql, (course_id, division_id, teacher_id, course_id, division_id, teacher_id, division_id))
+        else:
+            sql = """
+                SELECT 
+                    s.id as student_id,
+                    COALESCE(s.enrollment_no, CAST(s.id AS CHAR)) as enrollment_no,
+                    COALESCE(TRIM(CONCAT(COALESCE(s.f_name, ''), ' ', COALESCE(s.l_name, ''))), ua.user_name) as student_name,
+                    s.email,
+                    COUNT(DISTINCT qa.attempt_id) as quizzes_attempted,
+                    (
+                        SELECT COUNT(DISTINCT q.id)
+                        FROM quizzes q
+                        JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+                        WHERE qscd.course_id = %s AND q.teacher_id = %s
+                    ) as total_quizzes,
+                    ROUND(AVG(qa.total_score), 2) as avg_score
+                FROM student s
+                JOIN program_semester_division_batch_student psdbs ON s.id = psdbs.student_id
+                JOIN teacher_course_division tcd ON psdbs.division_id = tcd.division_id
+                LEFT JOIN user_account ua ON s.id = ua.user_id
+                LEFT JOIN (
+                    SELECT sqa.student_id, sqa.quiz_id, qa.attempt_id, qa.total_score
+                    FROM student_quiz_attempt sqa
+                    JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id AND qa.attempt_status = 'submitted'
+                    JOIN quizzes q ON sqa.quiz_id = q.id
+                    WHERE q.course_id = %s AND q.teacher_id = %s
+                ) qa ON s.id = qa.student_id
+                WHERE tcd.teacher_id = %s AND tcd.course_id = %s
+                GROUP BY s.id, s.enrollment_no, student_name, s.email
+                ORDER BY s.enrollment_no ASC
+            """
+            cursor.execute(sql, (course_id, teacher_id, course_id, teacher_id, teacher_id, course_id))
+
+        rows = cursor.fetchall() or []
+        roster = []
+        for r in rows:
+            quizzes_attempted = int(r.get('quizzes_attempted') or 0)
+            total_quizzes = int(r.get('total_quizzes') or 0)
+            avg_score = float(r['avg_score']) if r.get('avg_score') is not None else None
+
+            if quizzes_attempted == 0:
+                status = "Not Attempted"
+            elif avg_score is not None and avg_score >= 7.5:
+                status = "Good"
+            elif avg_score is not None and avg_score >= 5.0:
+                status = "Average"
+            else:
+                status = "Needs Support"
+
+            roster.append({
+                "student_id": r['student_id'],
+                "enrollment_no": r['enrollment_no'],
+                "student_name": r['student_name'],
+                "email": r.get('email') or '',
+                "quizzes_attempted": quizzes_attempted,
+                "total_quizzes": total_quizzes,
+                "quizzes_attempted_display": f"{quizzes_attempted} / {total_quizzes}",
+                "avg_score": avg_score,
+                "status": status
+            })
+        return roster
     except Exception as e:
         print(f"Error fetching course roster: {e}")
         return []
@@ -1606,4 +1770,4 @@ def update_manual_grade(attempt_id, new_score):
         cursor.close()
         conn.close()
 
-#❤️❤️❤️ --- Manage Student  --- ❤️❤️❤️
+# --- Manage Student ---

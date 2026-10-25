@@ -420,9 +420,10 @@ def delete_quiz_endpoint(quiz_id):
 def get_professor_analytics():
     teacher_id = session.get('user_id') or session.get('id')
     course_id = request.args.get('course_id')
+    division_id = request.args.get('division_id')
     quiz_id = request.args.get('quiz_id')
     try:
-        data = quiz_service.get_dashboard_analytics(teacher_id, course_id, quiz_id)
+        data = quiz_service.get_dashboard_analytics(teacher_id, course_id, division_id, quiz_id)
         return jsonify(data), 200
     except Exception as e:
         print(f"Error fetching professor analytics: {e}")
@@ -434,9 +435,10 @@ def get_professor_analytics():
 def export_student_marks():
     teacher_id = session.get('user_id') or session.get('id')
     course_id = request.args.get('course_id')
+    division_id = request.args.get('division_id')
     quiz_id = request.args.get('quiz_id')
     try:
-        data = quiz_service.get_all_student_marks_for_export(teacher_id, course_id, quiz_id)
+        data = quiz_service.get_all_student_marks_for_export(teacher_id, course_id, division_id, quiz_id)
         return jsonify(data), 200
     except Exception as e:
         print(f"Error exporting student marks: {e}")
@@ -634,11 +636,17 @@ def get_attempt_details(attempt_id):
 @professor_bp.route('/course-roster', methods=['GET'])
 @professor_required
 def get_course_roster_endpoint():
+    teacher_id = session.get('user_id') or session.get('id')
     course_id = request.args.get('course_id')
+    division_id = request.args.get('division_id')
     if not course_id:
         return jsonify([]), 200
     try:
-        roster = quiz_service.get_professor_course_roster(int(course_id))
+        roster = quiz_service.get_professor_course_roster(
+            teacher_id,
+            int(course_id),
+            int(division_id) if division_id else None
+        )
         return jsonify(roster), 200
     except Exception as e:
         print(f"Error loading course roster: {e}")
