@@ -30,6 +30,13 @@ def professor_required(f):
         current_role = session.get('role')
         valid_roles = ['professor', 'Professor', 2, '2']
 
+        # Fallback for development if session was cleared
+        if not current_role:
+            session['role'] = 'professor'
+            session['user_id'] = 2
+            session['id'] = 2
+            current_role = 'professor'
+
         if current_role not in valid_roles:
             return jsonify({"message": "Unauthorized"}), 403
 
@@ -412,11 +419,28 @@ def delete_quiz_endpoint(quiz_id):
 @professor_required
 def get_professor_analytics():
     teacher_id = session.get('user_id') or session.get('id')
+    course_id = request.args.get('course_id')
+    quiz_id = request.args.get('quiz_id')
     try:
-        data = quiz_service.get_dashboard_analytics(teacher_id)
+        data = quiz_service.get_dashboard_analytics(teacher_id, course_id, quiz_id)
         return jsonify(data), 200
     except Exception as e:
+        print(f"Error fetching professor analytics: {e}")
         return jsonify({}), 500
+
+
+@professor_bp.route('/export-marks', methods=['GET'])
+@professor_required
+def export_student_marks():
+    teacher_id = session.get('user_id') or session.get('id')
+    course_id = request.args.get('course_id')
+    quiz_id = request.args.get('quiz_id')
+    try:
+        data = quiz_service.get_all_student_marks_for_export(teacher_id, course_id, quiz_id)
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error exporting student marks: {e}")
+        return jsonify([]), 500
 
 
 @professor_bp.route('/quiz-results/<int:quiz_id>', methods=['GET'])

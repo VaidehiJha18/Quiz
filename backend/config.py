@@ -23,7 +23,7 @@ class Config:
     # Flask
     SECRET_KEY = os.environ.get('SECRET_KEY', 'a_new_secret_key_to_break_the_old_cookie_12345')
     DEBUG = True
-    SESSION_COOKIE_SECURE = True  
+    SESSION_COOKIE_SECURE = False  
     
 # --- Google Gemini AI API Key ---
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
