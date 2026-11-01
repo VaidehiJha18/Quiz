@@ -49,7 +49,7 @@ Traditional online learning management systems frequently suffer from unauthoriz
 ---
 
 ### 🏛️ Core System Architecture
-				  ┌─────────────────────────────────────────┐
+                  ┌────────────────────▼────────────────────┐
                   │          React.js Frontend (UI)         │
                   │  • Glassmorphism Dashboards             │
                   │  • Anti-Cheat Window & Tab Hooks        │
