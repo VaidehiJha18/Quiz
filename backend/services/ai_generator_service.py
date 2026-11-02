@@ -28,7 +28,12 @@ from backend.extensions import get_db_connection
 CANDIDATE_GEMINI_MODELS = [
     'gemini-1.5-flash',
     'gemini-2.5-flash',
+<<<<<<< Updated upstream
     'gemini-3.8-flash',
+=======
+    # 'gemini-2.0-flash',
+    # 'gemini-3.5-flash',
+>>>>>>> Stashed changes
 ]
 # 1. Document Text Extraction Helpers
 def extract_text_from_pdf(file_path):
