@@ -242,24 +242,37 @@ export default function GenerateCustomPaperPage() {
       let aiIndex = 0;
 
       updatedQuestions.forEach((qBlock) => {
-        qBlock.sub_parts.forEach((part) => {
-          if (aiIndex < extractedAIQuestions.length) {
-            const aiQ = extractedAIQuestions[aiIndex];
-            part.mode = 'manual';
-            part.manual_text = aiQ.question_txt;
-            part.marks = aiQ.marks || part.marks;
-            part.units = [String(aiQ.unit || '1')];
-            aiIndex++;
-          }
-        });
-      });
+      qBlock.sub_parts.forEach((part) => {
+        if (aiIndex < extractedAIQuestions.length) {
+          const aiQ = extractedAIQuestions[aiIndex];
+          part.mode = 'manual';
+          part.manual_text = aiQ.question_txt;
+          part.marks = aiQ.marks || part.marks;
+          part.units = [String(aiQ.unit || '1')];
 
-      setQuestions(updatedQuestions);
-      alert(`✨ Approved! Questions synced and auto-filled into your exam paper layout.`);
-    }
-    setShowReviewModal(false);
-    setSelectedFiles([]);
-  };
+          // Check if question has valid MCQ options
+          const hasOptions = Array.isArray(aiQ.options) && aiQ.options.length > 0;
+
+          if (aiQ.question_type === 'Descriptive' || !hasOptions) {
+            part.type = 'Descriptive';
+            part.options = [];
+          } else {
+            part.type = 'MCQ';
+            part.options = aiQ.options;
+            part.correct_index = aiQ.correct_index || 0;
+          }
+
+          aiIndex++;
+        }
+      });
+    });
+
+    setQuestions(updatedQuestions);
+    alert(`✨ Approved! Questions, types, and options synced cleanly to your blueprint layout.`);
+  }
+  setShowReviewModal(false);
+  setSelectedFiles([]);
+};
 
   const handleDocUpload = (e) => {
     if (e.target.files && e.target.files[0]) {

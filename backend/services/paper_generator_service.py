@@ -45,6 +45,7 @@ def generate_exam_paper(teacher_id, blueprint):
 
                     # Mode 1: Manual text entered by professor
                     if mode == 'manual' and part.get('manual_text'):
+                        # A. Insert master question into question_bank
                         cursor.execute("""
                             INSERT INTO question_bank (question_txt, marks, question_type, unit, bloom_level, course_outcome)
                             VALUES (%s, %s, %s, %s, %s, %s)
@@ -57,8 +58,19 @@ def generate_exam_paper(teacher_id, blueprint):
                             'CO1'
                         ))
                         chosen_qid = cursor.lastrowid
-                        cursor.execute("INSERT INTO question_course (question_id, course_id) VALUES (%s, %s)", (chosen_qid, blueprint['course_id']))
-                        cursor.execute("INSERT INTO question_employee (question_id, employee_id) VALUES (%s, %s)", (chosen_qid, teacher_id))
+
+                        # B. Link to Course
+                        cursor.execute(
+                            "INSERT INTO question_course (question_id, course_id) VALUES (%s, %s)", 
+                            (chosen_qid, blueprint['course_id'])
+                        )
+
+                        # C. 💡 REQUIRED FIX: Link to Creator Teacher so it shows under "My Questions"
+                        cursor.execute("""
+                            INSERT INTO question_employee (question_id, employee_id)
+                            VALUES (%s, %s)
+                            ON DUPLICATE KEY UPDATE employee_id = VALUES(employee_id)
+                        """, (chosen_qid, teacher_id))
 
                     # Mode 2: Specific question selected from database modal
                     elif mode == 'bank' and part.get('selected_qid'):
