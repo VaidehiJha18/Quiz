@@ -27,8 +27,11 @@ export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);
 
 // --- Professor Manage Students Endpoints ---
 
-export const fetchCourseRoster = (courseId) => 
-    api.get(`/prof/course-roster?course_id=${courseId}`);
+export const fetchCourseRoster = (courseId, divisionId) => {
+    const params = { course_id: courseId };
+    if (divisionId) params.division_id = divisionId;
+    return api.get("/prof/course-roster", { params });
+};
 
 export const fetchStudentHistory = (studentId, courseId) => 
     api.get(`/prof/students/${studentId}/history?course_id=${courseId}`);

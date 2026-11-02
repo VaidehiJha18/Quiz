@@ -1,3 +1,5 @@
+
+//vaidehi
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/layout/Header';
@@ -17,10 +19,11 @@ export default function QuizPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isQuizStarted, setIsQuizStarted] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
 
   const startTimeRef = useRef(null);
 
-  // Load quiz
+  // Load quiz details
   useEffect(() => {
     const loadQuiz = async () => {
       try {
@@ -33,7 +36,7 @@ export default function QuizPage() {
     if (quizId) loadQuiz();
   }, [quizId]);
 
-  // Submit handler
+  // Submit Handler
   const handleSubmit = useCallback(async (autoSubmitted = false, reason = '') => {
     if (submitted || isSubmitting || !quiz) return;
     if (!autoSubmitted && !window.confirm("Are you sure you want to submit?")) return;
@@ -62,7 +65,7 @@ export default function QuizPage() {
 
       await submitQuiz(quizId, payload);
       alert(autoSubmitted
-        ? "Your quiz was auto-submitted due to policy violations."
+        ? `Quiz auto-submitted due to violations: ${reason}`
         : "Quiz Submitted Successfully!"
       );
       navigate('/Student/Dashboard');
@@ -75,7 +78,7 @@ export default function QuizPage() {
     }
   }, [quiz, answers, isSubmitting, submitted, quizId, navigate]);
 
-  // Handle anti-cheat violation updates: ONLY submit on Strike 3
+  // Submit on Strike 3
   const handleViolationUpdate = useCallback((reason, count, isFinalViolation) => {
     if (isFinalViolation === true) {
       handleSubmit(true, reason);
@@ -83,26 +86,38 @@ export default function QuizPage() {
   }, [handleSubmit]);
 
   // Hook instance
-  const { AntiCheatOverlays } = useAntiCheat(
+  const {
+    AntiCheatOverlays,
+    calibrateSystem,
+    calibrationError,
+    violationCount
+  } = useAntiCheat(
     isQuizStarted,
     submitted,
-    handleViolationUpdate
+    handleViolationUpdate,
+    quizId
   );
 
-  // Enter fullscreen + start quiz
-  const enterLockdown = () => {
+  // Start Calibration and Enter Fullscreen
+  const handleStartExam = async () => {
+    setIsCalibrating(true);
+    const success = await calibrateSystem();
+    setIsCalibrating(false);
+
+    if (!success) return;
+
     const el = document.documentElement;
     if (el.requestFullscreen) {
-      el.requestFullscreen()
-        .then(() => {
-          setIsQuizStarted(true);
-          startTimeRef.current = new Date();
-        })
-        .catch(() => alert("Fullscreen is required. Please allow it and try again."));
-    } else {
-      setIsQuizStarted(true);
-      startTimeRef.current = new Date();
+      try {
+        await el.requestFullscreen();
+      } catch {
+        alert("Fullscreen is required. Please grant permission.");
+        return;
+      }
     }
+
+    setIsQuizStarted(true);
+    startTimeRef.current = new Date();
   };
 
   const handleSelect = (questionId, option) => {
@@ -121,38 +136,53 @@ export default function QuizPage() {
     );
   }
 
+  // Pre-quiz Calibration Screen
   if (!isQuizStarted) {
     return (
       <>
         <Header />
         <main className="page-container">
           <div style={{
-            maxWidth: '500px', margin: '80px auto', textAlign: 'center',
-            padding: '40px', borderRadius: '12px',
+            maxWidth: '520px', margin: '60px auto', textAlign: 'center',
+            padding: '36px', borderRadius: '12px',
             boxShadow: '0 4px 20px rgba(0,0,0,0.1)', background: '#fff'
           }}>
             <h2 style={{ marginBottom: '12px' }}>{quiz.title}</h2>
             <p style={{ color: '#555', marginBottom: '8px' }}>
               Duration: <strong>{quiz.time_limit || quiz.duration || 10} minutes</strong>
             </p>
-            <p style={{ color: '#555', marginBottom: '24px' }}>
+            <p style={{ color: '#555', marginBottom: '20px' }}>
               Questions: <strong>{quiz.questions?.length || 0}</strong>
             </p>
+
             <div style={{
               background: '#fff8e1', border: '1px solid #f0c040',
-              borderRadius: '8px', padding: '16px', marginBottom: '28px',
-              textAlign: 'left', fontSize: '14px', color: '#555'
+              borderRadius: '8px', padding: '16px', marginBottom: '24px',
+              textAlign: 'left', fontSize: '13.5px', color: '#444'
             }}>
-              <strong>Lockdown Rules:</strong>
+              <strong>Strict Proctoring Enforced:</strong>
               <ul style={{ margin: '8px 0 0 16px', lineHeight: '1.8' }}>
-                <li>Quiz opens in fullscreen — do not exit</li>
-                <li>Do NOT switch tabs or minimize</li>
-                <li>Do NOT press Alt+Tab or the Windows key</li>
-                <li>Do NOT right-click or copy text</li>
-                <li>3 violations = screen freeze + auto-submit</li>
+                <li>Fullscreen required across all platforms.</li>
+                <li>Tab switching, window resizing, or split screens trigger violations.</li>
+                <li>Camera analyzes single-face presence and gaze directions continuously.</li>
+                <li>Looking away from the screen will trigger a violation.</li>
+                <li>Webcam snapshots are recorded on violations.</li>
+                <li><strong>3 violations will automatically submit your exam.</strong></li>
               </ul>
             </div>
-            <Button label="Start Quiz (Enter Fullscreen)" onClick={enterLockdown} className="btn btn-primary" />
+
+            {calibrationError && (
+              <div style={{ color: '#d9534f', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold' }}>
+                {calibrationError}
+              </div>
+            )}
+
+            <Button
+              label={isCalibrating ? "Verifying Face & Fullscreen..." : "Calibrate Camera & Start Quiz"}
+              onClick={handleStartExam}
+              disabled={isCalibrating}
+              className="btn btn-primary"
+            />
           </div>
         </main>
         <Footer />
@@ -169,7 +199,21 @@ export default function QuizPage() {
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ margin: 0 }}>{quiz.title}</h2>
+            <div>
+              <h2 style={{ margin: 0 }}>{quiz.title}</h2>
+              <span style={{
+                display: 'inline-block',
+                marginTop: '6px',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                backgroundColor: violationCount >= 2 ? '#ff4d4f' : '#faad14',
+                color: '#fff'
+              }}>
+                Violations: {violationCount} / 3
+              </span>
+            </div>
             <QuizTimer
               timeLimitMinutes={quiz.time_limit || quiz.duration || 10}
               onTimeUp={() => handleSubmit(true, 'time_up')}

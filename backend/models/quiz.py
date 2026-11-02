@@ -1,4 +1,4 @@
-from ..extensions import db
+from extensions import db
 from datetime import datetime
 import uuid
 # Vaidehi Canges
@@ -51,3 +51,37 @@ class Quiz(db.Model):
     
     def __repr__(self):
         return f'<Quiz {self.quiz_title}>'
+    
+#vaidehi
+
+class QuizAttempt(db.Model):
+    __tablename__ = 'quiz_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quizzes.id'), nullable=False)
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=True)
+    duration_seconds = db.Column(db.Integer, default=0)
+    violation_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(50), default='IN_PROGRESS') # 'IN_PROGRESS', 'SUBMITTED', 'AUTO_SUBMITTED_CHEATING'
+    answers = db.Column(db.JSON, nullable=True)
+
+    violations = db.relationship('Violation', backref='attempt', lazy=True, cascade='all, delete-orphan')
+
+class Violation(db.Model):
+    __tablename__ = 'violations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempts.id'), nullable=False)
+    violation_type = db.Column(db.String(100), nullable=False)
+    snapshot = db.Column(db.Text(length=4294967295), nullable=False) # MySQL LONGTEXT for Base64 image
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.violation_type,
+            'snapshot': self.snapshot,
+            'timestamp': self.timestamp.isoformat()
+        }

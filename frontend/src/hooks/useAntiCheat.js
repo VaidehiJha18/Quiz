@@ -1,242 +1,326 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
 
+//vaidehi
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as tf from '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-webgl';
+import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 
-let globalStrikeCount = 0;
-let globalCooldown = false;
+export default function useAntiCheat(isQuizStarted, submitted, onViolationUpdate, quizId) {
+  const [violationCount, setViolationCount] = useState(0);
+  const [currentViolation, setCurrentViolation] = useState(null);
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [calibrationError, setCalibrationError] = useState('');
 
-export default function useAntiCheat(isActive, submitted, onViolation) {
-  const [violationsCount, setViolationsCount] = useState(0);
-  const [warningModal, setWarningModal] = useState({ open: false, reason: '' });
-  const [isFrozen, setIsFrozen] = useState(false);
-  const [countdown, setCountdown] = useState(3);
+  const videoRef = useRef(null);
+  const detectorRef = useRef(null);
+  const isTerminatedRef = useRef(false);
+  const lastGazeAwayRef = useRef(null);
+  const viewDimsRef = useRef({ w: window.innerWidth, h: window.innerHeight });
 
-  const countdownRef = useRef(null);
-  const onViolationRef = useRef(onViolation);
+  // 1. Capture snapshot as base64 JPEG from active webcam
+  const captureSnapshot = useCallback(() => {
+    if (!videoRef.current) return '';
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.65);
+  }, []);
 
-  useEffect(() => {
-    onViolationRef.current = onViolation;
-  }, [onViolation]);
+  // 2. Report Violation to Backend
+  const triggerViolation = useCallback(async (reason) => {
+    if (isTerminatedRef.current || submitted || !isQuizStarted) return;
 
-  // Reset counters when quiz starts
-  useEffect(() => {
-    if (isActive) {
-      globalStrikeCount = 0;
-      globalCooldown = false;
+    const snapshot = captureSnapshot();
+    const nextCount = violationCount + 1;
+    setViolationCount(nextCount);
+
+    const isFinalViolation = nextCount >= 3;
+    if (isFinalViolation) {
+      isTerminatedRef.current = true;
     }
-  }, [isActive]);
 
-  useEffect(() => () => clearInterval(countdownRef.current), []);
+    setCurrentViolation({
+      reason: reason.replace(/_/g, ' '),
+      snapshot,
+      count: nextCount
+    });
 
-  // 🔒Strike 3: Freeze Screen & Auto-Submit Sequence
-  const freezeAndSubmit = useCallback((reason) => {
-    if (submitted || !isActive || isFrozen) return;
-    setIsFrozen(true);
-    setCountdown(3);
+    try {
+      await fetch('/student/api/quiz/violation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizId,
+          violationType: reason,
+          snapshot,
+          violationCount: nextCount
+        })
+      });
+    } catch (err) {
+      console.error('Failed to log violation to server:', err);
+    }
 
-    let countTimer = 3;
-    countdownRef.current = setInterval(() => {
-      countTimer -= 1;
-      setCountdown(countTimer);
-      if (countTimer <= 0) {
-        clearInterval(countdownRef.current);
-        if (onViolationRef.current) {
-          onViolationRef.current(reason, 3, true);
-        }
+    if (onViolationUpdate) {
+      onViolationUpdate(reason, nextCount, isFinalViolation);
+    }
+  }, [submitted, isQuizStarted, captureSnapshot, violationCount, quizId, onViolationUpdate]);
+
+  // 3. Pre-Quiz Face & Camera Calibration
+  const calibrateSystem = async () => {
+    setCalibrationError('');
+    try {
+      await tf.setBackend('webgl');
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+        audio: false
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await new Promise((res) => {
+          videoRef.current.onloadedmetadata = () => res();
+        });
+        await videoRef.current.play();
       }
-    }, 1000);
-  }, [isActive, submitted, isFrozen]);
 
-  // Core Violation Handler
-  const triggerViolation = useCallback((reason) => {
-    if (!isActive || submitted || isFrozen || globalCooldown) return;
+      const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
+      const detector = await faceLandmarksDetection.createDetector(model, {
+        runtime: 'mediapipe',
+        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+        refineLandmarks: true,
+        maxFaces: 4
+      });
 
-    // Cooldown lock to prevent tab-switch + blur firing as multiple strikes at once
-    globalCooldown = true;
-    globalStrikeCount += 1;
+      detectorRef.current = detector;
 
-    const currentCount = globalStrikeCount;
-    setViolationsCount(currentCount);
+      // Calibration face check: Must detect exactly 1 person
+      const faces = await detector.estimateFaces(videoRef.current);
+      if (faces.length === 0) {
+        setCalibrationError('No face detected. Please center your face in the camera.');
+        return false;
+      }
+      if (faces.length > 1) {
+        setCalibrationError('Multiple faces detected. Only one candidate must be present.');
+        return false;
+      }
 
-    console.log(`[AntiCheat] Strike ${currentCount}/3 registered: ${reason}`);
-
-    if (currentCount >= 3) {
-      //  STRIKE 3: Terminate Quiz
-      setWarningModal({ open: false, reason: '' });
-      freezeAndSubmit(reason);
-    } else {
-      //  STRIKES 1 & 2: Show Warning Modal ONLY (Do NOT submit)
-      setWarningModal({ open: true, reason });
+      setIsCalibrated(true);
+      return true;
+    } catch (err) {
+      console.error('Calibration error:', err);
+      setCalibrationError('Camera access denied or failed to load detection model.');
+      return false;
     }
-  }, [isActive, submitted, isFrozen, freezeAndSubmit]);
-
-  // Dismiss modal and re-request full-screen mode for strikes 1 & 2
-  const dismissWarning = () => {
-    setWarningModal({ open: false, reason: '' });
-
-    // Request full-screen mode again when student acknowledges warning
-    const el = document.documentElement;
-    if (el.requestFullscreen && !document.fullscreenElement) {
-      el.requestFullscreen().catch(() => {});
-    }
-
-    // Unlock listener 1.5s after clicking button
-    setTimeout(() => {
-      globalCooldown = false;
-    }, 1500);
   };
 
-  // 1. Right Click Block
+  // 4. Check if student is looking away from screen
+  const checkLookingAway = (keypoints) => {
+    const nose = keypoints.find((k) => k.name === 'noseTip') || keypoints[1];
+    const leftEye = keypoints[33];
+    const rightEye = keypoints[263];
+    if (!nose || !leftEye || !rightEye) return false;
+
+    const eyeDistance = Math.abs(rightEye.x - leftEye.x);
+    const midPointX = (leftEye.x + rightEye.x) / 2;
+    const horizontalDeviation = (nose.x - midPointX) / eyeDistance;
+
+    return Math.abs(horizontalDeviation) > 0.35;
+  };
+
+  // 5. Browser Lockdown Listeners (Tab switch, split screen, window blur, fullscreen)
   useEffect(() => {
-    if (!isActive) return;
-    const b = (e) => e.preventDefault();
-    document.addEventListener('contextmenu', b);
-    return () => document.removeEventListener('contextmenu', b);
-  }, [isActive]);
+    if (!isQuizStarted || submitted) return;
 
-  // 2. Keyboard Shortcuts Block (Windows & Mac)
-  useEffect(() => {
-    if (!isActive) return;
-    const block = (e) => {
-      const key = e.key?.toUpperCase();
-      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-
-      if (['F12', 'F11', 'META', 'CONTEXTMENU'].includes(key)) {
-        e.preventDefault();
-        return;
-      }
-
-      if (isCmdOrCtrl && ['C', 'V', 'X', 'U', 'S', 'P', 'A', 'F', 'W', 'R', 'T', 'N'].includes(key)) {
-        e.preventDefault();
-        return;
-      }
-
-      if (isCmdOrCtrl && e.shiftKey && ['I', 'J', 'C', 'S', '4', '3', '5'].includes(key)) {
-        e.preventDefault();
-        return;
-      }
-
-      if ((e.altKey && e.key === 'Tab') || (e.metaKey && e.key === 'Tab')) {
-        e.preventDefault();
-        triggerViolation('alt_tab');
-      }
-    };
-
-    document.addEventListener('keydown', block);
-    return () => document.removeEventListener('keydown', block);
-  }, [isActive, triggerViolation]);
-
-  // 3. Tab Switch / Window Blur Detection
-  useEffect(() => {
-    if (!isActive) return;
     const handleVisibility = () => {
-      if (document.hidden) {
-        triggerViolation('tab_switch');
+      if (document.hidden) triggerViolation('TAB_SWITCH_OR_MINIMIZED');
+    };
+
+    const handleBlur = () => {
+      triggerViolation('WINDOW_FOCUS_LOST');
+    };
+
+    const handleResize = () => {
+      const dw = Math.abs(window.innerWidth - viewDimsRef.current.w);
+      const dh = Math.abs(window.innerHeight - viewDimsRef.current.h);
+      if (dw > 120 || dh > 120) {
+        triggerViolation('SPLIT_SCREEN_OR_WINDOW_RESIZED');
+        viewDimsRef.current = { w: window.innerWidth, h: window.innerHeight };
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isActive, triggerViolation]);
 
-  // 4. Block Copy/Cut/Select
-  useEffect(() => {
-    if (!isActive) return;
-    const b = (e) => e.preventDefault();
-    document.addEventListener('copy', b);
-    document.addEventListener('cut', b);
-    document.addEventListener('selectstart', b);
-    return () => {
-      document.removeEventListener('copy', b);
-      document.removeEventListener('cut', b);
-      document.removeEventListener('selectstart', b);
+    const handleFullscreen = () => {
+      if (!document.fullscreenElement) {
+        triggerViolation('EXITED_FULLSCREEN');
+      }
     };
-  }, [isActive]);
 
-  // Overlays UI
-  const AntiCheatOverlays = () => {
-    return (
-      <>
-        <style>{`
-          ${isFrozen ? 'body { overflow: hidden !important; }' : ''}
-          @keyframes pulse {
-            0%   { box-shadow: 0 0 0 0px rgba(192,57,43,0.5); }
-            70%  { box-shadow: 0 0 0 18px rgba(192,57,43,0); }
-            100% { box-shadow: 0 0 0 0px rgba(192,57,43,0); }
+    const handleContextMenu = (e) => e.preventDefault();
+    const handleKeyDown = (e) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) ||
+        (e.ctrlKey && e.key === 'u')
+      ) {
+        e.preventDefault();
+        triggerViolation('DEV_TOOLS_ATTEMPT');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('resize', handleResize);
+    document.addEventListener('fullscreenchange', handleFullscreen);
+    document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('fullscreenchange', handleFullscreen);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isQuizStarted, submitted, triggerViolation]);
+
+  // 6. Real-time Face & Gaze Evaluation Loop
+  useEffect(() => {
+    if (!isQuizStarted || submitted || !detectorRef.current) return;
+
+    const interval = setInterval(async () => {
+      if (isTerminatedRef.current || !videoRef.current) return;
+
+      try {
+        const faces = await detectorRef.current.estimateFaces(videoRef.current, { flipHorizontal: false });
+
+        if (faces.length === 0) {
+          triggerViolation('NO_FACE_DETECTED');
+        } else if (faces.length > 1) {
+          triggerViolation('MULTIPLE_FACES_DETECTED');
+        } else {
+          const lookingAway = checkLookingAway(faces[0].keypoints);
+          if (lookingAway) {
+            if (!lastGazeAwayRef.current) {
+              lastGazeAwayRef.current = Date.now();
+            } else if (Date.now() - lastGazeAwayRef.current > 2500) {
+              triggerViolation('LOOKING_AWAY_FROM_SCREEN');
+              lastGazeAwayRef.current = null;
+            }
+          } else {
+            lastGazeAwayRef.current = null;
           }
-        `}</style>
+        }
+      } catch (err) {
+        console.error('Proctor loop error:', err);
+      }
+    }, 700);
 
-        {/* Warning Modal (Strikes 1 & 2) */}
-        {warningModal.open && !isFrozen && (
+    return () => clearInterval(interval);
+  }, [isQuizStarted, submitted, triggerViolation]);
+
+  // 7. Student Overlays (Camera and Violation Dialog)
+  const AntiCheatOverlays = () => (
+    <>
+      {/* Floating webcam view */}
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        width: '180px',
+        background: '#000',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        zIndex: 9999,
+        textAlign: 'center'
+      }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '135px', objectFit: 'cover', transform: 'scaleX(-1)' }}
+        />
+        <div style={{ color: '#fff', fontSize: '11px', padding: '4px', fontWeight: 'bold' }}>
+          <span style={{ color: '#ff4d4f', marginRight: '4px' }}>●</span> PROCTOR ACTIVE
+        </div>
+      </div>
+
+      {/* Real-time violation alert modal */}
+      {currentViolation && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000
+        }}>
           <div style={{
-            position: 'fixed', inset: 0, zIndex: 99998,
-            backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#fff',
+            borderRadius: '10px',
+            padding: '24px',
+            maxWidth: '420px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)'
           }}>
-            <div style={{
-              background: '#fff', borderRadius: '12px', padding: '28px',
-              textAlign: 'center', maxWidth: '400px', width: '90%',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            }}>
-              <div style={{ fontSize: '44px', marginBottom: '12px' }}>⚠️</div>
-              <h3 style={{ color: '#e67e22', margin: '0 0 8px', fontSize: '20px' }}>
-                Violation Warning ({violationsCount}/3)
-              </h3>
-              <p style={{ color: '#444', fontSize: '14px', margin: '0 0 18px', lineHeight: 1.5 }}>
-                A policy violation was detected: <strong>{warningModal.reason.replace('_', ' ')}</strong>.
-                <br /><br />
-                You have <strong>{3 - violationsCount}</strong> warning(s) left. Clicking below will return you to full-screen mode. Reaching 3 violations will terminate your quiz.
-              </p>
-              <button 
-                onClick={dismissWarning}
+            <h3 style={{ color: '#d9534f', margin: '0 0 10px 0' }}>⚠️ Violation Detected</h3>
+            <p style={{ margin: '8px 0', fontSize: '15px' }}>
+              <strong>Reason:</strong> {currentViolation.reason}
+            </p>
+            <p style={{ margin: '8px 0', color: currentViolation.count >= 2 ? '#d9534f' : '#666' }}>
+              Violation Strike: <strong>{currentViolation.count} / 3</strong>
+              <br />
+              <small>(Reaching 3 strikes will auto-submit your test)</small>
+            </p>
+
+            {currentViolation.snapshot && (
+              <div style={{ margin: '15px 0' }}>
+                <p style={{ fontSize: '12px', color: '#777', marginBottom: '4px' }}>Captured Evidence:</p>
+                <img
+                  src={currentViolation.snapshot}
+                  alt="Violation Snapshot"
+                  style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #ddd' }}
+                />
+              </div>
+            )}
+
+            {currentViolation.count < 3 ? (
+              <button
+                onClick={() => setCurrentViolation(null)}
                 style={{
-                  background: '#e67e22', color: '#fff', border: 'none',
-                  padding: '12px 24px', borderRadius: '6px', fontSize: '14px',
-                  fontWeight: '600', cursor: 'pointer', width: '100%'
+                  background: '#1890ff',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  marginTop: '10px'
                 }}
               >
-                I Understand & Re-enter Fullscreen
+                Acknowledge & Continue
               </button>
-            </div>
+            ) : (
+              <p style={{ color: '#d9534f', fontWeight: 'bold' }}>Auto-submitting test...</p>
+            )}
           </div>
-        )}
+        </div>
+      )}
+    </>
+  );
 
-        {/* Freeze Modal (Strike 3) */}
-        {isFrozen && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 99999,
-            backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            cursor: 'not-allowed', userSelect: 'none',
-          }}>
-            <div style={{ fontSize: '60px', marginBottom: '20px' }}>🔒</div>
-            <div style={{
-              background: '#fff', borderRadius: '16px', padding: '36px 44px',
-              textAlign: 'center', maxWidth: '400px', width: '90%',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
-            }}>
-              <h2 style={{ color: '#c0392b', margin: '0 0 10px', fontSize: '22px' }}>
-                Quiz Terminated
-              </h2>
-              <p style={{ color: '#666', fontSize: '15px', margin: '0 0 24px', lineHeight: 1.6 }}>
-                You reached 3 violations.<br />
-                Your quiz is being auto-submitted.
-              </p>
-              <div style={{
-                width: '80px', height: '80px', borderRadius: '50%',
-                background: '#c0392b', color: '#fff', fontSize: '38px',
-                fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px', animation: 'pulse 1s ease-out infinite',
-              }}>
-                {countdown}
-              </div>
-              <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>
-                Submitting in {countdown} second{countdown !== 1 ? 's' : ''}...
-              </p>
-            </div>
-          </div>
-        )}
-      </>
-    );
+  return {
+    AntiCheatOverlays,
+    calibrateSystem,
+    isCalibrated,
+    calibrationError,
+    violationCount
   };
-
-  return { AntiCheatOverlays, violationsCount };
 }

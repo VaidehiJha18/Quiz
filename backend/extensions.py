@@ -1,6 +1,6 @@
 import pymysql
 from flask import current_app
-from.config import Config
+from .config import Config
 
 def get_db_connection():
     # Fallback to Config values if current_app isn't fully ready or env vars are empty
