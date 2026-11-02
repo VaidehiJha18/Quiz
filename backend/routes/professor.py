@@ -1,9 +1,11 @@
 import os
 import pymysql
 import traceback
-from datetime import datetime
+import csv
+import io
+from datetime import datetime, date, timedelta
 from functools import wraps
-from flask import Blueprint, session, request, jsonify, send_file, current_app
+from flask import Blueprint, session, request, jsonify, send_file, current_app, Response
 from werkzeug.utils import secure_filename
 
 from ..extensions import get_db_connection
@@ -69,12 +71,21 @@ def get_schools():
 def get_programs():
     school_id = request.args.get('school_id')
     if not school_id:
+        print("DEBUG: No school_id provided. Returning empty list.")
         return jsonify([]), 200
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
-        cursor.execute("SELECT id, program_name FROM program WHERE school_id = %s ORDER BY program_name ASC", (school_id,))
+        sql = "SELECT id, program_name FROM program WHERE school_id = %s ORDER BY program_name ASC"
+        
+        # 🔍 PRINT 1: Verify the query and parameter being sent to MySQL
+        print(f"DEBUG: Executing SQL -> SELECT program for school_id={school_id}")
+        cursor.execute(sql, (int(school_id),))
+
         data = cursor.fetchall()
+        # 🔍 PRINT 2: Check the exact raw data fetched from MySQL
+        print(f"DEBUG: MySQL returned {len(data)} record(s): {data}")
+        
         return jsonify(data), 200
     except Exception as e:
         print(f"Error fetching programs: {e}")
@@ -89,6 +100,7 @@ def get_programs():
 def fetch_departments_list_view():
     program_id_raw = request.args.get('program_id')
     if not program_id_raw:
+        print("DEBUG: No program_id provided. Returning empty list.")
         return jsonify([]), 200
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -176,6 +188,31 @@ def get_course_divisions():
 # -------------------------------------------------------------------------
 # 2. QUESTION BANK CRUD
 # -------------------------------------------------------------------------
+@professor_bp.route('/questions/csv-template', methods=['GET'])
+@professor_required
+def download_csv_template():
+    """
+    Generates and returns the updated CSV template matching the complete 11 headers of dbquiz.question_bank.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 1. Write the updated complete header matching question_bank schema
+    writer.writerow([
+        'Question_Text', 'Question_Type', 'Unit', 'Marks', 
+        'Bloom_Level', 'Course_Outcome', 
+        'Option_A', 'Option_B', 'Option_C', 'Option_D', 'Correct_Option'
+    ])
+    
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=question_bank_template.csv"}
+    )
+
+
 @professor_bp.route('/questions', methods=['GET'])
 @professor_required
 def get_questions_api():

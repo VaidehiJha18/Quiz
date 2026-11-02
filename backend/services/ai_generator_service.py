@@ -26,9 +26,9 @@ from backend.extensions import get_db_connection
 # Comprehensive list of valid Google Gemini models with automatic fallback
 # Updated valid models list for google-genai
 CANDIDATE_GEMINI_MODELS = [
+    'gemini-1.5-flash',
     'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-3.5-flash',
+    'gemini-3.8-flash',
 ]
 # 1. Document Text Extraction Helpers
 def extract_text_from_pdf(file_path):

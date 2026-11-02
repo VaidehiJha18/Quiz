@@ -67,14 +67,20 @@ def student_dashboard():
 
             if start_val and end_val:
                 if isinstance(start_val, str):
-                    start_val = datetime.fromisoformat(start_val.replace('T', ' ').replace('Z', ''))
+                    try:
+                        start_val = datetime.fromisoformat(start_val.replace('T', ' ').replace('Z', ''))
+                    except ValueError:
+                        pass
                 if isinstance(end_val, str):
-                    end_val = datetime.fromisoformat(end_val.replace('T', ' ').replace('Z', ''))
+                    try:
+                        end_val = datetime.fromisoformat(end_val.replace('T', ' ').replace('Z', ''))
+                    except ValueError:
+                        pass
 
-                if now > end_val:
-                    continue
+                if isinstance(end_val, datetime) and now > end_val:
+                    continue  # Expired quizzes move to history
 
-                if now < start_val:
+                if isinstance(start_val, datetime) and now < start_val:
                     q['computed_status'] = 'upcoming'
                 else:
                     q['computed_status'] = 'available'
@@ -198,7 +204,7 @@ def record_violation():
             (quiz_id, student_id)
         )
         row = cursor.fetchone()
-        current_count = row['total'] if row else 1
+        current_count = row.get('total', 1) if isinstance(row, dict) else 1
 
         auto_submit = current_count >= 3
 
@@ -211,6 +217,68 @@ def record_violation():
         conn.rollback()
         print(f"Error recording violation: {e}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# --- 5. Student Quiz Attempt History ---
+@student_bp.route('/my-history', methods=['GET'])
+def get_student_history():
+    student_id = session.get('id')
+    if not student_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    try:
+        history_sql = """
+            SELECT 
+                qa.attempt_id,
+                q.id AS quiz_id,
+                q.quiz_title,
+                q.course,
+                qa.total_score,
+                qa.submit_time,
+                qa.is_published,
+                'Completed' AS attempt_status
+            FROM student_quiz_attempt sqa
+            JOIN quiz_attempt qa ON sqa.attempt_id = qa.attempt_id
+            JOIN quizzes q ON sqa.quiz_id = q.id
+            WHERE sqa.student_id = %s
+
+            UNION ALL
+
+            SELECT 
+                NULL AS attempt_id,
+                q.id AS quiz_id,
+                q.quiz_title,
+                q.course,
+                0 AS total_score,
+                q.end_time AS submit_time,
+                0 AS is_published,
+                'Missed' AS attempt_status
+            FROM quizzes q
+            JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
+            JOIN student_academic_info sai ON qscd.semester_id = sai.semester_id AND qscd.division_id = sai.division_id
+            WHERE sai.student_id = %s
+              AND LOWER(q.quiz_status) = 'published'
+              AND q.end_time < NOW()
+              AND q.id NOT IN (
+                  SELECT quiz_id FROM student_quiz_attempt WHERE student_id = %s
+              )
+            ORDER BY submit_time DESC
+        """
+        cursor.execute(history_sql, (student_id, student_id, student_id))
+        history = cursor.fetchall() or []
+
+        for item in history:
+            if isinstance(item.get('submit_time'), datetime):
+                item['submit_time'] = item['submit_time'].strftime("%Y-%m-%d %H:%M:%S")
+
+        return jsonify(history), 200
+    except Exception as e:
+        print(f"Error fetching student history: {e}")
+        return jsonify({"message": "Server Error"}), 500
     finally:
         cursor.close()
         conn.close()

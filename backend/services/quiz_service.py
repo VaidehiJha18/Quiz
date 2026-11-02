@@ -12,8 +12,9 @@ import os
 
 # 1. Fetch Teacher's Courses
 def get_courses_for_teacher(teacher_id):
-    """Fetches courses linked to the professor's department."""
-    print(f"DEBUG: Fetching courses for Teacher ID: {teacher_id}") # 👈 Print ID
+    print(f"\n==========================================")
+    print(f"DEBUG: Querying database for Teacher ID: {teacher_id}")
+
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     try:
@@ -22,13 +23,20 @@ def get_courses_for_teacher(teacher_id):
             FROM course c
             JOIN semester_course sc ON c.id = sc.course_id
             JOIN department_semester ds ON sc.semester_id = ds.semester_id
-            JOIN employee_school_department esd ON ds.dept_id = esd.dept_id
-            WHERE esd.employee_id = %s
-            ORDER BY c.course_name
+            JOIN teacher_course_division tcd ON c.id = tcd.course_id
+            WHERE tcd.teacher_id = %s
+            ORDER BY c.course_name ASC
         """
         cursor.execute(sql, (teacher_id,))
         results = cursor.fetchall()
-        print(f"DEBUG: Found {len(results)} courses: {results}") # 👈 Print Results
+        # 🔍 PRINT 2: Check if MySQL returned rows or an empty list
+        if not results:
+            print(f"⚠️ DEBUG: MySQL returned 0 records! Check junction table entries for teacher {teacher_id}.")
+        else:
+            print(f"✅ DEBUG: Successfully fetched {len(results)} course(s) from MySQL:")
+            print(results)
+        print(f"==========================================\n")
+        
         return results
     except Exception as e:
         print(f"Error fetching teacher courses: {e}")
@@ -128,6 +136,7 @@ def fetch_questions(employee_id, fetch_scope='creator', course_id=None):
                 WHERE
                     qe.employee_id = %s 
                     AND qc.course_id = %s
+                ORDER BY qb.id DESC
             """
             cursor.execute(select_clause, (emp_id, course_id))
         else:
@@ -139,14 +148,11 @@ def fetch_questions(employee_id, fetch_scope='creator', course_id=None):
                     am.id AS option_id,
                     am.option_text,
                     am.is_correct
-                FROM
-                    question_bank qb
-                JOIN
-                    answer_map am ON qb.id = am.question_id
-                JOIN
-                    question_employee qe ON qb.id = qe.question_id
-                WHERE
-                    qe.employee_id = %s
+                FROM question_bank qb
+                LEFT JOIN answer_map am ON qb.id = am.question_id
+                JOIN question_employee qe ON qb.id = qe.question_id
+                WHERE qe.employee_id = %s
+                ORDER BY qb.id DESC
             """
             cursor.execute(select_clause, (emp_id,))
         results = cursor.fetchall()
@@ -867,7 +873,7 @@ def get_dashboard_analytics(teacher_id, course_id=None, division_id=None, quiz_i
                 div_letter = d['division']
                 dname = f"Division {div_letter}" if not str(div_letter).lower().startswith('division') else str(div_letter)
                 sql_quizzes = """
-                    SELECT DISTINCT q.id AS quiz_id, q.quiz_title, q.created_at, q.time_limit, q.total_questions
+                    SELECT DISTINCT q.id AS quiz_id, q.quiz_title, q.created_at, q.duration AS time_limit, q.total_questions
                     FROM quizzes q
                     JOIN quiz_semester_course_division qscd ON q.id = qscd.quiz_id
                     WHERE q.teacher_id = %s AND qscd.course_id = %s AND qscd.division_id = %s
@@ -915,6 +921,25 @@ def get_dashboard_analytics(teacher_id, course_id=None, division_id=None, quiz_i
         else:
             quiz_id = None
 
+        # --- Compute Overall Unfiltered Totals for Dashboard Cards ---
+        cursor.execute("SELECT COUNT(*) AS total FROM quizzes WHERE teacher_id = %s", (teacher_id,))
+        overall_quizzes = cursor.fetchone()['total'] or 0
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT qe.question_id) AS total
+            FROM question_employee qe
+            WHERE qe.employee_id = %s
+        """, (teacher_id,))
+        overall_questions = cursor.fetchone()['total'] or 0
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT sqa.attempt_id) AS total
+            FROM student_quiz_attempt sqa
+            JOIN quizzes q ON sqa.quiz_id = q.id
+            WHERE q.teacher_id = %s
+        """, (teacher_id,))
+        overall_attempts = cursor.fetchone()['total'] or 0
+
         # If course or division is not selected, return metadata only
         if not course_id or not division_id:
             return {
@@ -922,9 +947,9 @@ def get_dashboard_analytics(teacher_id, course_id=None, division_id=None, quiz_i
                 "selected_course_id": course_id,
                 "selected_division_id": division_id,
                 "selected_quiz_id": quiz_id,
-                "total_quizzes": 0,
-                "turnout_display": "0 / 0 (0%)",
-                "total_attempts": 0,
+                "total_quizzes": overall_quizzes,
+                "turnout_display": f"{overall_attempts} / {overall_quizzes} ({(overall_attempts / overall_quizzes * 100) if overall_quizzes > 0 else 0:.0f}%)",
+                "total_attempts": overall_attempts,
                 "unique_students": 0,
                 "enrolled_students": 0,
                 "average_score": 0.0,

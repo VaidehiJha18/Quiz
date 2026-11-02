@@ -1,4 +1,5 @@
 from argon2 import PasswordHasher, exceptions as argon2_exceptions
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from ..extensions import get_db_connection
 from ..models.user import User
 import pymysql.cursors
@@ -34,26 +35,6 @@ class AuthService:
             raise ValueError("Invalid university email format")
         return self.ROLE_MAPPING[role_name]
 
-    # def _validate_master_account(self, email, role_name, cursor):
-    #     """Checks if the email exists in the respective master table and returns the master ID."""
-    #     if role_name == 'professor' or role_name == 'admin':
-    #         master_table = 'employee'
-    #         id_column = 'id' #  Assuming your employee table uses 'id' as primary key
-    #     elif role_name == 'student':
-    #         master_table = 'student'
-    #         id_column = 'id' #  Assuming your student table uses 'id' as primary key
-    #     else:
-    #         return None # Fallback for unknown roles
-
-    #     sql = f"SELECT {id_column} AS master_id FROM {master_table} WHERE email=%s"
-    #     cursor.execute(sql, (email,))
-    #     master_record = cursor.fetchone()
-        
-    #     if not master_record:
-    #         raise ValueError(f"Email not found in the {master_table} database. Cannot register.")
-            
-    #     return master_record['master_id']
-    #Priyanka
     def _validate_master_account(self, email, role_name, cursor):
         """Checks if the email exists in the respective master table and returns the master ID."""
         
@@ -82,10 +63,19 @@ class AuthService:
         return self.ph.hash(password)
 
     def _check_password(self, stored_hash, password):
+        if not stored_hash or not password:
+            return False
+        
         try:
+        # Try standard Argon2 verification
             return self.ph.verify(stored_hash, password)
-        except argon2_exceptions.VerifyMismatchError:
-            return False   
+        except InvalidHashError:
+        # Fallback for plain text seed passwords loaded directly from Excel
+            print("⚠️ Warning: Non-Argon2 hash format detected. Performing plain text fallback.")
+            return stored_hash == password
+        except VerifyMismatchError:
+        # Incorrect password
+            return False 
 
     # ----------------- SIGNUP -----------------
     #Priyanka
@@ -144,7 +134,7 @@ class AuthService:
 
         try:
             # 1. Fetch user record from user_account
-            sql = "SELECT user_id, user_name, email, password_hash, role_id FROM user_account WHERE email=%s"
+            sql = "SELECT user_id, user_name, email, password_hash, role_id FROM user_account WHERE LOWER(email) = LOWER(%s)"
             cursor.execute(sql, (email,))
             user_record = cursor.fetchone()
 
@@ -152,26 +142,30 @@ class AuthService:
                 print(f"DEBUG: No user_account record found for email: {email}")
                 return None
 
-            stored_hash = user_record.pop('password_hash')
+            # Extract and verify password
+            stored_hash = user_record.get('password_hash')
             if not self._check_password(stored_hash, password):
                 print(f"DEBUG: Password mismatch for email: {email}")
                 return None
 
             # 2. Map role_id to role name
             role_name_map = {v: k for k, v in self.ROLE_MAPPING.items()}
-            db_role_id = int(user_record.pop('role_id'))
+            db_role_id = int(user_record.get('role_id'))
             role_name = role_name_map.get(db_role_id, 'unknown')
             print(f"DEBUG: User {email} has role_id: {db_role_id} -> Role: {role_name}")
-            user_record['role'] = role_name
-            user_record['username'] = user_record.pop('user_name')
-            user_record['password_hash'] = stored_hash
 
-            # 3. ✅ NEW: Look up the Master ID (employee_id/student_id)
-            # This ID will be used for session['id'] and question ownership/filtering
+            user_record['role'] = role_name
+            user_record['username'] = user_record.get('user_name')
+
+            # 3. Look up Master ID (employee_id / student_id)
             master_id = self._validate_master_account(email, role_name, cursor)
             user_record['master_id'] = master_id
 
             return User.from_dict(user_record)
+
+        except Exception as e:
+            print(f"Authentication Error: {e}")
+            return None
         finally:
             cursor.close()
             conn.close()
