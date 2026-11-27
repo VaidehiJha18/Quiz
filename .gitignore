@@ -197,8 +197,15 @@ generate_readme.py
 test.py
 test_quiz_generation.py
 *.bak
+**/.DS_Store
+**/.DS_Store
+**/.DS_Store
+**/.DS_Store
+**/.DS_Store
+**/.DS_Store
 
-#  IDEs
-.idea/
+
+# Database SQL backups
+*.sql
 
 .vscode/

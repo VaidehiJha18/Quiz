@@ -2,7 +2,10 @@ import os
 import re
 import pandas as pd
 import docx
-import pdfplumber
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
 from backend.extensions import get_db_connection
 
 def parse_and_save_csv(file_path, teacher_id, course_id):
@@ -123,6 +126,8 @@ def parse_and_save_pdf(file_path, teacher_id, course_id):
     saved_count = 0
 
     try:
+        if pdfplumber is None:
+            return {"status": "error", "message": "pdfplumber is not installed"}
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()

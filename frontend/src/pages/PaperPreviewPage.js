@@ -32,7 +32,7 @@ export default function PaperPreviewPage() {
     }
   };
 
-const renderMathText = (txt) => {
+  const renderMathText = (txt) => {
     if (!txt) return '';
     return txt.split(/(\$.*?\$)/).map((segment, idx) => {
       if (segment.startsWith('$') && segment.endsWith('$')) {
@@ -46,6 +46,12 @@ const renderMathText = (txt) => {
       }
       return segment;
     });
+  };
+
+  // Cleans redundant leading digits from parsed question text (e.g., "3. In the relational..." -> "In the relational...")
+  const cleanQuestionText = (text) => {
+    if (!text) return '';
+    return text.replace(/^\s*\d+[\.\)]\s*/, '');
   };
 
   if (loading) return <div className="preview-loading">Loading paper preview...</div>;
@@ -106,9 +112,9 @@ const renderMathText = (txt) => {
               <table className="question-table">
                 <thead>
                   <tr className="q-header-row">
-                    <th style={{ width: '8%' }}>{sec.question_number}</th>
-                    <th style={{ width: '82%' }}>{sec.instructions}</th>
-                    <th style={{ width: '10%', textAlign: 'right' }}>({String(sec.total_section_marks).padStart(2, '0')})</th>
+                    <th className="qno-col">{sec.question_number}</th>
+                    <th className="instructions-col">{sec.instructions}</th>
+                    <th className="totmarks-col">({String(sec.total_section_marks).padStart(2, '0')})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -116,7 +122,7 @@ const renderMathText = (txt) => {
                     <tr key={mIdx} className="q-row">
                       <td className="sub-label">{item.sub_label}</td>
                       <td className="q-text">
-                        {renderMathText(item.question_txt)}
+                        {renderMathText(cleanQuestionText(item.question_txt))}
                         {item.diagram_url && (
                           <div className="diagram-box">
                             <img src={item.diagram_url} alt="Diagram" />
@@ -129,14 +135,14 @@ const renderMathText = (txt) => {
 
                   {sec.or_questions?.length > 0 && (
                     <>
-                      <tr>
-                        <td colSpan="3" className="or-divider-cell">OR</td>
+                      <tr className="or-divider-row">
+                        <td colSpan="3">OR</td>
                       </tr>
                       {sec.or_questions.map((item, oIdx) => (
                         <tr key={oIdx} className="q-row">
                           <td className="sub-label">{item.sub_label}</td>
                           <td className="q-text">
-                            {renderMathText(item.question_txt)}
+                            {renderMathText(cleanQuestionText(item.question_txt))}
                             {item.diagram_url && (
                               <div className="diagram-box">
                                 <img src={item.diagram_url} alt="Diagram" />

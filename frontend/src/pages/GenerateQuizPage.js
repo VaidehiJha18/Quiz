@@ -34,6 +34,8 @@ export default function GenerateQuizPage() {
   const [loading, setLoading] = useState(false);
   const [courseStats, setCourseStats] = useState(null);
 
+  const [numQuestions, setNumQuestions] = useState(10);
+
   // 1. Load School on Mount
   useEffect(() => {
     loadSchools();
@@ -123,7 +125,8 @@ export default function GenerateQuizPage() {
         // ✅ 3. USE API.POST TO SEND THE SELECTED UNITS ARRAY
         const res = await api.post('/prof/generate', { 
             course_id: selections.course, 
-            units: selectedUnits 
+            units: selectedUnits,
+            num_questions: Number(numQuestions) 
         });
 
         if (res.status === 201) {
@@ -205,6 +208,34 @@ export default function GenerateQuizPage() {
             </div>
           </div>
         )}
+
+        {selections.course && (
+        <div className="form-group" style={{ marginTop: '20px', marginBottom: '10px', textAlign: 'left' }}>
+          <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+            Number of Questions:
+          </label>
+          <select 
+            value={numQuestions} 
+            onChange={(e) => setNumQuestions(e.target.value)}
+            style={{ 
+              padding: '10px 12px', 
+              borderRadius: '6px', 
+              border: '1px solid #ccc', 
+              width: '200px',
+              fontSize: '1rem',
+              backgroundColor: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            <option value={5}>5 Questions</option>
+            <option value={10}>10 Questions</option>
+            <option value={15}>15 Questions</option>
+            <option value={20}>20 Questions</option>
+            <option value={30}>30 Questions</option>
+            <option value={50}>50 Questions</option>
+          </select>
+        </div>
+      )}
 
         {/* Generate Button */}
         <div style={{marginTop: '30px', textAlign: 'center'}}>

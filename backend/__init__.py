@@ -2,6 +2,8 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from .config import Config
+from dotenv import load_dotenv
+load_dotenv()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -24,6 +26,6 @@ def create_app(config_class=Config):
     app.register_blueprint(professor_bp, url_prefix='/prof')
     app.register_blueprint(student_bp, url_prefix='/student')
 
-    print("✅ Flask app created successfully with CORS enabled")
+    print("[OK] Flask app created successfully with CORS enabled")
     
     return app

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/';
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/';
 
-// const API_URL = 'http://localhost:5000/api/questions'; //Vaidehi Changes
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -27,8 +27,11 @@ export const fetchQuestionById = (id) => api.get(`/prof/questions/${id}`);
 
 // --- Professor Manage Students Endpoints ---
 
-export const fetchCourseRoster = (courseId) => 
-    api.get(`/prof/course-roster?course_id=${courseId}`);
+export const fetchCourseRoster = (courseId, divisionId) => {
+    const params = { course_id: courseId };
+    if (divisionId) params.division_id = divisionId;
+    return api.get("/prof/course-roster", { params });
+};
 
 export const fetchStudentHistory = (studentId, courseId) => 
     api.get(`/prof/students/${studentId}/history?course_id=${courseId}`);
@@ -410,6 +413,19 @@ export const downloadPaperDocx = (paperId) => {
 //❤️❤️❤️❤️
 export const generateAIQuestions = async (formData) => {
   return await api.post('/prof/generate-ai-questions', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+// 6. Generate AI Questions for a Specific Paper
+export const generatePaperAIQuestions = (formData) => {
+  return api.post('/prof/generate-paper-ai-questions', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+export const uploadCourseSyllabus = (formData) => {
+  return api.post('/prof/upload-syllabus', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
 };

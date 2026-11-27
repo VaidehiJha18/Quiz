@@ -235,54 +235,105 @@ export default function ViewQuestionsPage() {
           <div style={styles.tableCard}>
             {loading ? <p style={{padding:'20px', textAlign:'center'}}>Loading...</p> : (
             <table className="custom-table" style={styles.table}>
-              <thead>
-                <tr style={styles.tableHeaderRow}>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Unit</th> 
-                  <th style={styles.th}>Question</th>
-                  <th style={styles.th}>Option 1</th>
-                  <th style={styles.th}>Option 2</th>
-                  <th style={styles.th}>Option 3</th>
-                  <th style={styles.th}>Option 4</th>
-                  <th style={styles.th}>Solution</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questions.length > 0 ? (
-                  questions.map((q) => (
-                    <tr key={q.question_id} style={styles.tableRow}>
-                      <td style={styles.td}>{q.question_id}</td>
-                      <td style={{...styles.td, fontWeight: 'bold', color: '#667eea'}}>Unit {q.unit || 1}</td> 
-                      <td style={styles.td}>{q.question_txt}</td>
-                      <td style={styles.td}>{q.options?.[0]?.option_text || '-'}</td>
-                      <td style={styles.td}>{q.options?.[1]?.option_text || '-'}</td>
-                      <td style={styles.td}>{q.options?.[2]?.option_text || '-'}</td>
-                      <td style={styles.td}>{q.options?.[3]?.option_text || '-'}</td>
-                      <td style={{ ...styles.td, color: 'green', fontWeight: 'bold' }}>
-                        {q.options?.find(opt => opt.is_correct === 1 || opt.is_correct === true)?.option_text || 'N/A'}
-                      </td>
-                      <td style={styles.td}>
-                        {viewMode === 'mine' ? (
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                              <button onClick={() => navigate(`/professor/questions/edit/${q.question_id}`)} style={styles.editBtn}>Edit</button>
-                              <button onClick={() => handleDelete(q.question_id)} style={styles.deleteBtn}>Del</button>
-                          </div>
-                        ) : (
-                          <span style={{color: '#999', fontSize: '0.85rem'}}>Read-Only</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="9" style={{ padding: '30px', textAlign: 'center', color: '#777' }}>
-                      {viewMode === 'mine' ? "You haven't added any questions for this course yet." : "No questions exist for this course."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+  <thead>
+    <tr style={styles.tableHeaderRow}>
+      <th style={styles.th}>ID</th>
+      <th style={styles.th}>Unit</th> 
+      <th style={styles.th}>Type</th>
+      <th style={{ ...styles.th, width: '45%' }}>Question</th>
+      <th style={styles.th}>Details / Options</th>
+      <th style={styles.th}>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {questions.length > 0 ? (
+      questions.map((q) => {
+        // Check if question is MCQ or Descriptive
+        const isMCQ = q.question_type === 'MCQ' || (q.options && q.options.length > 0);
+
+        return (
+          <tr key={q.question_id || q.id} style={styles.tableRow}>
+            {/* ID Column */}
+            <td style={styles.td}>{q.question_id || q.id}</td>
+            
+            {/* Unit Column */}
+            <td style={{ ...styles.td, fontWeight: 'bold', color: '#667eea' }}>
+              Unit {q.unit || 1}
+            </td>
+
+            {/* Type Badge Column */}
+            <td style={styles.td}>
+              <span style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                backgroundColor: isMCQ ? '#e0e7ff' : '#fef3c7',
+                color: isMCQ ? '#3730a3' : '#92400e',
+                display: 'inline-block'
+              }}>
+                {q.question_type || (isMCQ ? 'MCQ' : 'Descriptive')}
+              </span>
+            </td>
+
+            {/* Question Text Column */}
+            <td style={{ ...styles.td, fontWeight: '500', color: '#1e293b', lineHeight: '1.5' }}>
+              {q.question_txt || q.text}
+            </td>
+
+            {/* Options / Solution Column */}
+            <td style={styles.td}>
+              {isMCQ ? (
+                /* MCQ Options Grid */
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', maxWidth: '350px' }}>
+                  {q.options?.map((opt, idx) => (
+                    <div 
+                      key={idx} 
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.78rem',
+                        backgroundColor: (opt.is_correct === 1 || opt.is_correct === true) ? '#dcfce7' : '#f8fafc',
+                        border: (opt.is_correct === 1 || opt.is_correct === true) ? '1px solid #86efac' : '1px solid #e2e8f0',
+                        color: (opt.is_correct === 1 || opt.is_correct === true) ? '#166534' : '#334155',
+                        fontWeight: (opt.is_correct === 1 || opt.is_correct === true) ? 'bold' : 'normal'
+                      }}
+                    >
+                      {String.fromCharCode(65 + idx)}. {opt.option_text || opt.text || opt} {(opt.is_correct === 1 || opt.is_correct === true) ? '✓' : ''}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Descriptive Question Indicator */
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                  Theory Question
+                </span>
+              )}
+            </td>
+
+            {/* Actions Column */}
+            <td style={styles.td}>
+              {viewMode === 'mine' ? (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button onClick={() => navigate(`/professor/questions/edit/${q.question_id || q.id}`)} style={styles.editBtn}>Edit</button>
+                  <button onClick={() => handleDelete(q.question_id || q.id)} style={styles.deleteBtn}>Del</button>
+                </div>
+              ) : (
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Read-Only</span>
+              )}
+            </td>
+          </tr>
+        );
+      })
+    ) : (
+      <tr>
+        <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: '#777' }}>
+          {viewMode === 'mine' ? "You haven't added any questions for this course yet." : "No questions exist for this course."}
+        </td>
+      </tr>
+    )}
+  </tbody>
+</table>
             )}
           </div>
         </>
