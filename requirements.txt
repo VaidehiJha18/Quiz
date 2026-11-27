@@ -40,3 +40,4 @@ openpyxl
 flask-excel
 python-dotenv
 certifi
+python-docx
