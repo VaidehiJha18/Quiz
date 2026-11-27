@@ -7,11 +7,11 @@ load_dotenv()
 
 class Config:
     # Database
-    DB_HOST = os.environ.get('DB_HOST', 'quiz-application-db-tanishkamaurya1407-1c1b.g.aivencloud.com')
-    DB_USER = os.environ.get('DB_USER', 'avnadmin')
+    DB_HOST = os.environ.get('DB_HOST', 'gateway01.ap-southeast-1.prod.aws.tidbcloud.com')
+    DB_USER = os.environ.get('DB_USER', '28cPQL4bhapuvCC.root')
     DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
     DB_DATABASE = os.environ.get('DB_DATABASE', 'dbquiz')
-    DB_PORT = int(os.environ.get('DB_PORT', 20465))
+    DB_PORT = int(os.environ.get('DB_PORT', 4000))
 
     # SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_DATABASE_URI = (

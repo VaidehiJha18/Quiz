@@ -161,6 +161,32 @@ class AuthService:
             master_id = self._validate_master_account(email, role_name, cursor)
             user_record['master_id'] = master_id
 
+            # # 4. ✅ Automatically link user_id in student OR employee table if currently NULL
+            # user_id_val = user_record['user_id']
+            # role_lower = role_name.lower()
+
+            # if role_lower == 'student':
+            #     try:
+            #         cursor.execute("""
+            #             UPDATE student 
+            #             SET user_id = %s 
+            #             WHERE LOWER(email) = LOWER(%s) AND user_id IS NULL
+            #         """, (user_id_val, email))
+            #         conn.commit()
+            #     except Exception as e:
+            #         print(f"DEBUG: Could not auto-link student user_id: {e}")
+
+            # elif role_lower in ['professor', 'admin', 'employee']:
+            #     try:
+            #         cursor.execute("""
+            #             UPDATE employee 
+            #             SET user_id = %s 
+            #             WHERE LOWER(email) = LOWER(%s) AND user_id IS NULL
+            #         """, (user_id_val, email))
+            #         conn.commit()
+            #     except Exception as e:
+            #         print(f"DEBUG: Could not auto-link employee user_id: {e}")
+
             return User.from_dict(user_record)
 
         except Exception as e:
